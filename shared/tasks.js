@@ -8,11 +8,32 @@ const defaultSubtypeKey = '__default__';
 
 const PythonSubtypes = {
     ENERGY_PLUS: 'energy_plus',
-    NUMPY: 'numpy'
+    NUMPY: 'numpy',
+    ARIMA: 'arima'
 };
 
 const subtypesByType = {
     [TaskType.PYTHON]: PythonSubtypes
+};
+
+const defaultPythonLibs = ['elasticsearch'];
+
+const taskSubtypeSpecs = {
+    [TaskType.PYTHON]: {
+        libs: defaultPythonLibs,
+        [PythonSubtypes.ENERGY_PLUS]: {
+            label: 'EnergyPlus task',
+            libs: [...defaultPythonLibs, 'eppy', 'requests']
+        },
+        [PythonSubtypes.NUMPY]: {
+            label: 'Numpy task',
+            libs: [...defaultPythonLibs, 'numpy', 'dtw']
+        },
+        [PythonSubtypes.ARIMA]: {
+            label: 'ARIMA task',
+            libs: [...defaultPythonLibs, 'numpy', 'statsmodels']
+        }
+    }
 };
 
 const BuildState = {

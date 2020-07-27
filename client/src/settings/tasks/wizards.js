@@ -906,6 +906,7 @@ wizardSpecs[TaskType.PYTHON] = {
     subtypes: {
         [subtypesByType[TaskType.PYTHON].ENERGY_PLUS]: numpyWizardSpecs,
         [subtypesByType[TaskType.PYTHON].NUMPY]: energyPlusWizardSpecs,
+        [subtypesByType[TaskType.PYTHON].ARIMA]: numpyWizardSpecs,
 
     }
 };
