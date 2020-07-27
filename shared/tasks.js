@@ -10,7 +10,8 @@ if (Object.freeze) {
 
 const PythonSubtypes = {
     ENERGY_PLUS: 'energy_plus',
-    NUMPY: 'numpy'
+    NUMPY: 'numpy',
+    ARIMA: 'arima'
 };
 
 if (Object.freeze) {
@@ -33,6 +34,10 @@ const taskSubtypeSpecs = {
         [PythonSubtypes.NUMPY]: {
             label: 'Numpy task',
             libs: [...defaultPythonLibs, 'numpy', 'dtw']
+        },
+        [PythonSubtypes.ARIMA]: {
+            label: 'ARIMA task',
+            libs: [...defaultPythonLibs, 'numpy', 'statsmodels']
         }
     }
 };

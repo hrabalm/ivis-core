@@ -32,6 +32,7 @@ const typeToEditor = new Map();
 typeToEditor.set(TaskType.PYTHON, 'python');
 typeToEditor.set(TaskType.NUMPY, 'python');
 typeToEditor.set(TaskType.ENERGY_PLUS, 'python');
+typeToEditor.set(TaskType.ARIMA, 'python');
 
 @withComponentMixins([
     withTranslation,
