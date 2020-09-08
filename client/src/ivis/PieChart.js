@@ -81,7 +81,6 @@ export class StaticPieChart extends Component {
 
     componentDidUpdate(prevProps, prevState, prevContext) {
         const forceRefresh = this.prevContainerNode !== this.containerNode
-            || prevProps.data !== this.props.data
             || prevProps.config !== this.props.config;
 
         this.createChart(forceRefresh);
@@ -138,12 +137,14 @@ export class StaticPieChart extends Component {
             .attr('d', arcGen)
             .attr('filter', 'url(#shadow)')
             .attr('fill', 'rgba(0,0,0, 0.3)');
+        shadows.exit().remove();
 
         const arcs = this.pieSelection.selectAll('path').data(pieGen(this.props.config.arcs));
         arcs.enter().append('path')
             .merge(arcs)
             .attr('d', arcGen)
             .attr('fill', d => this.props.getArcColor(d.data.color));
+        arcs.exit().remove();
 
         const labels = this.labelsSelection.selectAll('text').data(pieGen(this.props.config.arcs));
         labels.enter().append('text')
@@ -157,6 +158,7 @@ export class StaticPieChart extends Component {
                 const ratio = Math.floor(d.data.value * 100 / total);
                 return ratio > 5 ? `${ratio}%` : '';
             })
+        labels.exit().remove();
     }
 
     render() {

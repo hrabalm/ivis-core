@@ -15,7 +15,7 @@ export class Tooltip extends Component {
 
     static propTypes = {
         config: PropTypes.any.isRequired,
-        signalSetsData: PropTypes.object,
+        signalSetsData: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
         selection: PropTypes.object,
         mousePosition: PropTypes.object,
         containerWidth: PropTypes.number.isRequired,

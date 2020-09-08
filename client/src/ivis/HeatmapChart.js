@@ -19,23 +19,9 @@ import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
 import {Tooltip} from "./Tooltip";
 import {Icon} from "../lib/bootstrap-components";
-import {
-    brushHandlesLeftRight,
-    brushHandlesTopBottom,
-    getColorScale, setZoomTransform,
-    transitionInterpolate,
-    WheelDelta,
-    ZoomEventSources
-} from "./common";
+import {AreZoomTransformsEqual, brushHandlesLeftRight, brushHandlesTopBottom, ConfigDifference, drawBars, getColorScale, setZoomTransform, TimeIntervalDifference, transitionInterpolate, WheelDelta, ZoomEventSources} from "./common";
 import styles from "./CorrelationCharts.scss";
 import {PropType_d3Color} from "../lib/CustomPropTypes";
-
-const ConfigDifference = {
-    NONE: 0,
-    RENDER: 1,
-    DATA: 2,
-    DATA_WITH_CLEAR: 3
-};
 
 function compareConfigs(conf1, conf2) {
     let diffResult = ConfigDifference.NONE;
@@ -133,6 +119,7 @@ export class HeatmapChart extends Component {
         this.brushLeft = null;
         this.zoom = null;
         this.lastZoomCausedByUser = false;
+        this.ignoreZoomEvents = false;
 
         this.resizeListener = () => {
             this.createChart(true);
@@ -241,16 +228,8 @@ export class HeatmapChart extends Component {
 
         // test if time interval changed
         const considerTs = !!this.props.config.tsSigCid;
-        if (considerTs) {
-            const prevAbs = this.getIntervalAbsolute(prevProps);
-            const prevSpec = this.getIntervalSpec(prevProps);
-
-            if (prevSpec !== this.getIntervalSpec()) {
-                configDiff = Math.max(configDiff, ConfigDifference.DATA_WITH_CLEAR);
-            } else if (prevAbs !== this.getIntervalAbsolute()) { // If its just a regular refresh, don't clear the chart
-                configDiff = Math.max(configDiff, ConfigDifference.DATA);
-            }
-        }
+        if (considerTs)
+            configDiff = Math.max(configDiff, TimeIntervalDifference(this, prevProps));
 
         // test if limits changed
         if (!Object.is(prevProps.xMinValue, this.props.xMinValue) || !Object.is(prevProps.xMaxValue, this.props.xMaxValue) || !Object.is(prevProps.yMinValue, this.props.yMinValue) || !Object.is(prevProps.yMaxValue, this.props.yMaxValue))
@@ -262,7 +241,7 @@ export class HeatmapChart extends Component {
         }
 
         if (configDiff === ConfigDifference.DATA_WITH_CLEAR) {
-            this.setZoom(d3Zoom.zoomIdentity); // reset zoom
+            this.setZoom(d3Zoom.zoomIdentity, 1); // reset zoom
             this.setState({
                 statusMsg: t('Loading...')
             }, () => {
@@ -276,10 +255,10 @@ export class HeatmapChart extends Component {
         } else {
             const forceRefresh = this.prevContainerNode !== this.containerNode
                 || prevState.signalSetData !== this.state.signalSetData
-                || prevState.zoomYScaleMultiplier !== this.state.zoomYScaleMultiplier // update zoom extent
                 || configDiff !== ConfigDifference.NONE;
 
-            const updateZoom = !Object.is(prevState.zoomTransform, this.state.zoomTransform);
+            const updateZoom = !AreZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform)
+                || prevState.zoomYScaleMultiplier !== this.state.zoomYScaleMultiplier;
 
             this.createChart(forceRefresh, updateZoom);
             this.prevContainerNode = this.containerNode;
@@ -343,7 +322,7 @@ export class HeatmapChart extends Component {
                     filter.children.push(this.props.filter);
 
                 // filter by current zoom
-                if (!Object.is(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.zoomYScaleMultiplier !== 1) {
+                if (!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.zoomYScaleMultiplier !== 1) {
                     const scaleX = this.state.zoomTransform.k;
                     maxBucketCountX = Math.ceil(maxBucketCountX * scaleX);
                     const scaleY = this.state.zoomTransform.k * this.state.zoomYScaleMultiplier;
@@ -646,34 +625,12 @@ export class HeatmapChart extends Component {
         if (this.props.withOverviewBottom)
             this.createChartOverviewBottom(signalSetData.buckets, this.overviewXScale, d3Color.color(this.props.overviewBottomColor || colors[colors.length - 1]));
 
-        // we don't want to change zoom object and cursor area when updating only zoom (it breaks touch drag)
-        if (forceRefresh || widthChanged) {
-            this.createChartCursorArea(width, height);
-            if (this.props.withZoomX || this.props.withZoomY)
-                this.createChartZoom(xSize, ySize);
-            if (this.props.withOverviewLeft && this.props.withOverviewLeftBrush)
-                this.createChartOverviewLeftBrush();
-            if (this.props.withOverviewBottom && this.props.withOverviewBottomBrush)
-                this.createChartOverviewBottomBrush();
-        }
-    }
-
-    /** Prepares rectangle for cursor movement events.
-     *  Called from this.createChart(). */
-    createChartCursorArea(width, height) {
-        this.cursorAreaSelection
-            .selectAll('rect')
-            .remove();
-
-        this.cursorAreaSelection
-            .append('rect')
-            .attr('pointer-events', 'all')
-            .attr('cursor', 'crosshair')
-            .attr('x', 0)
-            .attr('y', 0)
-            .attr('width', width - this.props.margin.left - this.props.margin.right)
-            .attr('height', height - this.props.margin.top - this.props.margin.bottom)
-            .attr('visibility', 'hidden');
+        if (this.props.withZoomX || this.props.withZoomY)
+            this.createChartZoom(xSize, ySize);
+        if (this.props.withOverviewLeft && this.props.withOverviewLeftBrush)
+            this.createChartOverviewLeftBrush();
+        if (this.props.withOverviewBottom && this.props.withOverviewBottomBrush)
+            this.createChartOverviewBottomBrush();
     }
 
     /** Handles mouse movement to select the bin (for displaying its details in Tooltip, etc.).
@@ -787,6 +744,7 @@ export class HeatmapChart extends Component {
         const self = this;
 
         const handleZoom = function () {
+            if (self.ignoreZoomEvents) return;
             // noinspection JSUnresolvedVariable
             let newTransform = d3Event.transform;
             let newZoomYScaleMultiplier = self.state.zoomYScaleMultiplier;
@@ -798,12 +756,16 @@ export class HeatmapChart extends Component {
             // noinspection JSUnresolvedVariable
             if (d3Event.sourceEvent && d3Event.sourceEvent.type === "wheel" && self.props.withTransition) {
                 self.lastZoomCausedByUser = true;
+                self.ignoreZoomEvents = true;
                 transitionInterpolate(select(self), self.state.zoomTransform, newTransform, (t, y) => {
                     setZoomTransform(self)(t, y);
                     self.moveBrush(t, y || newZoomYScaleMultiplier); // sourceEvent is "wheel"
                 }, () => {
+                    self.ignoreZoomEvents = false;
                     self.deselectPoints();
                     setZoomTransform(self)(newTransform, newZoomYScaleMultiplier);
+                    if (self.zoom && !AreZoomTransformsEqual(newTransform, d3Zoom.zoomTransform(self.svgContainerSelection.node())))
+                        self.zoom.transform(self.svgContainerSelection, newTransform);
                     self.moveBrush(newTransform, newZoomYScaleMultiplier);
                 }, 150, self.state.zoomYScaleMultiplier, newZoomYScaleMultiplier);
             } else {
@@ -812,6 +774,8 @@ export class HeatmapChart extends Component {
                     self.lastZoomCausedByUser = true;
 
                 setZoomTransform(self)(newTransform, newZoomYScaleMultiplier);
+                if (self.zoom && !AreZoomTransformsEqual(newTransform, d3Zoom.zoomTransform(self.svgContainerSelection.node())))
+                    self.zoom.transform(self.svgContainerSelection, newTransform);
 
                 // noinspection JSUnresolvedVariable
                 if (d3Event.sourceEvent && d3Event.sourceEvent.type === "brush" && (d3Event.sourceEvent.target === self.brushLeft || d3Event.sourceEvent.target === self.brushBottom)) return;
@@ -1120,45 +1084,30 @@ export class HeatmapChart extends Component {
     }
 
     drawVerticalBars(data, barsSelection, keyScale, probScale, barColor) {
-        const bars = barsSelection
-            .selectAll('rect')
-            .data(data, d => d.key);
         const ySize = probScale.range()[0];
         const barWidth = (keyScale.range()[1] - keyScale.range()[0]) / data.length;
 
-        bars.enter()
-            .append('rect')
-            .merge(bars)
-            .attr('x', d => keyScale(d.key))
-            .attr('y', d => probScale(d.prob))
-            .attr("width", barWidth)
-            .attr("height", d => ySize - probScale(d.prob))
-            .attr("fill", barColor);
-
-        bars.exit()
-            .remove();
+        drawBars(data, barsSelection,
+            d => keyScale(d.key),
+            d => probScale(d.prob),
+            barWidth,
+            d => ySize - probScale(d.prob),
+            barColor,
+            d => d.key);
     }
 
     drawHorizontalBars(data, barsSelection, keyScale, probScale, barColor) {
-        const bars = barsSelection
-            .selectAll('rect')
-            .data(data, d => d.key);
         const barHeight = (keyScale.range()[0] - keyScale.range()[1]) / data.length;
         const yCompensate = this.yType === DataType.NUMBER ? barHeight : 0;
 
-        bars.enter()
-            .append('rect')
-            .merge(bars)
-            .attr('x', 0)
-            .attr('y', d => keyScale(d.key) - yCompensate)
-            .attr("width", d => probScale(d.prob))
-            .attr("height", barHeight)
-            .attr("fill", barColor);
-
-        bars.exit()
-            .remove();
+        drawBars(data, barsSelection,
+            0,
+            d => keyScale(d.key) - yCompensate,
+            d => probScale(d.prob),
+            barHeight,
+            barColor,
+            d => d.key);
     }
-
 
     render() {
         if (!this.state.signalSetData) {
@@ -1237,8 +1186,13 @@ export class HeatmapChart extends Component {
                                 width={250}
                             />
                             }
-                            <g ref={node => this.cursorAreaSelection = select(node)}
-                               transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}/>
+                            {/* cursor area */}
+                            <rect ref={node => this.cursorAreaSelection = select(node)}
+                                  x={this.props.margin.left} y={this.props.margin.top}
+                                  width={this.state.width - this.props.margin.left - this.props.margin.right}
+                                  height={this.props.height - this.props.margin.top - this.props.margin.bottom}
+                                  pointerEvents={"all"} cursor={"crosshair"} visibility={"hidden"}
+                            />
                         </svg>
                     </div>
                     {this.props.withOverviewBottom &&

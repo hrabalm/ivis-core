@@ -48,7 +48,8 @@ export class BubblePlot extends Component {
                     createRegressionForEachColor: PropTypes.bool, // default: false
                     bandwidth: PropTypes.number,    // for LOESS
                     order: PropTypes.number         // for polynomial
-                }))
+                })),
+                filter: PropTypes.object,
             })).isRequired
         }).isRequired,
 

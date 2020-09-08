@@ -17,7 +17,7 @@ import * as dateMath from "../lib/datemath";
 import {Icon} from "../lib/bootstrap-components";
 import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
-import {setZoomTransform, transitionInterpolate, WheelDelta} from "./common";
+import {AreZoomTransformsEqual, ConfigDifference, setZoomTransform, transitionInterpolate, WheelDelta} from "./common";
 import * as d3Zoom from "d3-zoom";
 
 export function createBase(base, self) {
@@ -94,14 +94,7 @@ export const RenderStatus = {
     NO_DATA: 1
 };
 
-
-
-export const ConfigDifference = {
-    // We assume here order from the most benign to the worst
-    NONE: 0,
-    RENDER: 1,
-    DATA: 2
-};
+export {ConfigDifference} from "./common";
 
 function compareConfigs(conf1, conf2, customComparator) {
     let diffResult = ConfigDifference.NONE;
@@ -281,7 +274,7 @@ export class TimeBasedChartBase extends Component {
         } else if (this.delayedFetchDueToTimeIntervalChartWidthUpdate || prevAbs !== this.getIntervalAbsolute()) { // If its just a regular refresh, don't clear the chart
             this.delayedFetchDueToTimeIntervalChartWidthUpdate = false;
 
-            if (!Object.is(this.state.zoomTransform, d3Zoom.zoomIdentity)) // update time interval based on what is currently visible
+            if (!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity)) // update time interval based on what is currently visible
                 this.setInterval(...this.xScaleDomain);
 
             this.fetchData();
@@ -291,7 +284,7 @@ export class TimeBasedChartBase extends Component {
                 || prevState.signalSetsData !== this.state.signalSetsData
                 || configDiff !== ConfigDifference.NONE
                 || this.getIntervalAbsolute(prevProps) !== this.getIntervalAbsolute()
-                || !Object.is(prevState.zoomTransform, this.state.zoomTransform);
+                || !AreZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
 
             this.createChart(signalSetsData, forceRefresh);
             this.prevContainerNode = this.containerNode;
@@ -579,7 +572,7 @@ export class TimeBasedChartBase extends Component {
                         </clipPath>
                     </defs>
                     <g transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`} clipPath="url(#plotRect)" ref={node => this.GraphContentSelection = select(node)}>
-                        {(!Object.is(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.loading) &&
+                        {(!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.loading) &&
                             <rect width={"100%"} height={"100%"} fill={"#e5e5e5"} />}
                         {this.props.getGraphContent(this)}
                     </g>

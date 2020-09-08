@@ -479,6 +479,13 @@ class QueryProcessor {
                     elsAgg.terms = { ...this.getField(field) };
                     if (agg.maxBucketCount)
                         elsAgg.terms.size = agg.maxBucketCount;
+                }
+                else if (agg.agg_type === "percentiles") {
+                    elsAgg.percentiles = { ...this.getField(field) };
+                    if (agg.percents)
+                        elsAgg.percentiles.percents = agg.percents;
+                    if (agg.hasOwnProperty("keyed"))
+                        elsAgg.percentiles.keyed = agg.keyed;
                 } else {
                     throw new Error("Aggregation type '" + agg.agg_type + "' is currently not supported, try omitting agg_type for default aggregation based on signal type.");
                 }
@@ -587,6 +594,10 @@ class QueryProcessor {
             additionalResponses.sum_other_doc_count = aggResp.sum_other_doc_count;
         };
 
+        const _processPercentilesAgg = (aggResp, additionalResponses) => {
+            additionalResponses.values = aggResp.values;
+        };
+
         let aggNo = 0;
         for (const agg of aggs) {
             const elsAggResp = elsAggsResp['agg_' + aggNo];
@@ -599,6 +610,9 @@ class QueryProcessor {
                 agg_type = agg.agg_type;
                 if (agg.agg_type === "terms") {
                     _processTermsAgg(elsAggResp, buckets, additionalResponses);
+                }
+                else if (agg.agg_type === "percentiles") {
+                    _processPercentilesAgg(elsAggResp, additionalResponses);
                 } else {
                     throw new Error("Aggregation type '" + agg.agg_type + "' is currently not supported, try omitting agg_type for default aggregation based on signal type.");
                 }
