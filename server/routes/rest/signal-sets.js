@@ -4,6 +4,7 @@ const passport = require('../../lib/passport');
 const moment = require('moment');
 const signalSets = require('../../models/signal-sets');
 const signalSetsAggregations = require('../../models/signal-set-aggregations');
+const signalSetsPredictions = require('../../models/signal-set-predictions');
 const panels = require('../../models/panels');
 const templates = require('../../models/templates');
 const users = require('../../models/users');
@@ -186,6 +187,14 @@ router.postAsync('/signal-sets/:signalSetId/aggregations', passport.loggedIn, pa
 
 router.postAsync('/signal-set-aggregations-table/:signalSetId', passport.loggedIn, async (req, res) => {
     return res.json(await signalSetsAggregations.listDTAjax(req.context, castToInteger(req.params.signalSetId), req.body));
+});
+
+router.postAsync('/signal-sets/:signalSetId/predictions/arima', passport.loggedIn, passport.csrfProtection, async (req, res) => {
+    return res.json(await signalSetsPredictions.create(req.context, castToInteger(req.params.signalSetId), req.body));
+})
+
+router.postAsync('/signal-set-predictions-table/:signalSetId', passport.loggedIn, async (req, res) => {
+    return res.json(await signalSetsPredictions.listDTAjax(req.context, castToInteger(req.params.signalSetId), req.body));
 });
 
 /* This is for testing. Kept here as long as we are still making bigger changes to ELS query processor

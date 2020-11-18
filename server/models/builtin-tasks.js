@@ -4,6 +4,7 @@ const knex = require('../lib/knex');
 const {getVirtualNamespaceId} = require("../../shared/namespaces");
 const {TaskSource, BuildState, TaskType} = require("../../shared/tasks");
 const em = require('../lib/extension-manager');
+const arima = require('./arima/arima.js');
 
 const aggregationTask = {
     name: 'aggregation',
@@ -384,12 +385,15 @@ ivis.store_state(state)
 `
     },
 };
+const arimaTask = arima.arimaTask;
+
 /**
  * All default builtin tasks
  */
 const builtinTasks = [
     aggregationTask,
-    flattenTask
+    flattenTask,
+    arimaTask
 ];
 
 em.on('builtinTasks.add', addTasks);

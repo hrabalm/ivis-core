@@ -1,0 +1,54 @@
+[
+  {
+    "id": "sigSet",
+    "help": "Signal set for the sensors",
+    "type": "signalSet",
+    "label": "Signal Set"
+  },
+  {
+    "id": "ts",
+    "help": "Timestamp order is based on",
+    "type": "signal",
+    "label": "Timestamp",
+    "cardinality": "1",
+    "signalSetRef": "sigSet"
+  },
+  {
+    "id": "source",
+    "help": "Source of values",
+    "type": "signal",
+    "label": "Source of value",
+    "cardinality": "1",
+    "signalSetRef": "sigSet"
+  },
+  {
+    "id": "seasonality",
+    "help": "Should SARIMA be used?",
+    "type": "boolean",
+    "label": "Seasonality"
+  },
+  {
+    "id": "seasonality_m",
+    "help": "Number of observations per season.",
+    "type": "number",
+    "label": "Seasonality m"
+  },
+  {
+    "id": "resampling",
+    "help": "Should data be resampled?",
+    "type": "boolean",
+    "label": "Resampling"
+  },
+  {
+    "id": "resampling_interval",
+    "help": "",
+    "type": "text",
+    "label": "Resampling interval"
+  },
+  {
+    "id": "auto",
+    "help": "Should stepwise search be used for finding (non-specified) ARIMA parameters?",
+    "type": "boolean",
+    "label": "Auto ARIMA"
+  }
+]
