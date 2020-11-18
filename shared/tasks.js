@@ -37,7 +37,7 @@ const taskSubtypeSpecs = {
         },
         [PythonSubtypes.ARIMA]: {
             label: 'ARIMA task',
-            libs: [...defaultPythonLibs, 'numpy', 'statsmodels']
+            libs: [...defaultPythonLibs, 'numpy', 'statsmodels', 'pmdarima']
         }
     }
 };

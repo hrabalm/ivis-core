@@ -114,7 +114,7 @@ export default class CUD extends Component {
                     this.fetchTaskParams(taskId);
                 }
             } else {
-                const builtinTask = this.state.builtinTasks && this.state.builtinTasks.find(task => task.id = taskId);
+                const builtinTask = this.state.builtinTasks && this.state.builtinTasks.find(task => task.id == taskId);
 
                 if (builtinTask) {
                     state.formState = state.formState.setIn(['data', 'taskParams', 'value'], builtinTask.settings.params);

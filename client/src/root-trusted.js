@@ -51,6 +51,8 @@ import SignalSetsList from './settings/signal-sets/List';
 import SignalSetsCUD from './settings/signal-sets/CUD';
 import SignalSetAggregations from './settings/signal-sets/Aggregations';
 import AggregationsCUD from './settings/signal-sets/AggregationsCUD';
+import SignalSetPredictions from './settings/signal-sets/Predictions';
+import PredictionsArimaCUD from './settings/signal-sets/PredictionsArimaCUD';
 import RecordsList from './settings/signal-sets/RecordsList';
 import RecordsCUD from './settings/signal-sets/RecordsCUD';
 
@@ -480,6 +482,21 @@ const getStructure = t => {
                                                 title: t('Create'),
                                                 panelRender: props => <AggregationsCUD signalSet={props.resolved.signalSet} action="create" />
                                             }
+                                        }
+                                    },
+                                    'predictions': {
+                                        title: t('Predictions'),
+                                        link: params => `/settings/signal-sets/${params.signalSetId}/predictions`,
+                                        visible: true, // TODO: only if ts and sufficient permissions
+                                        panelRender: props => <SignalSetPredictions signalSet={props.resolved.signalSet} />, // TODO
+                                        children: {
+                                            'create-arima': {
+                                                title: t('Add ARIMA model'),
+                                                link: params => `/settings/signal-sets/${params.signalSetId}/predictions/create-arima`,
+                                                //visible: true,
+                                                panelRender: props => <PredictionsArimaCUD signalSet={props.resolved.signalSet} action="create" />
+                                                //panelRender: props => <WorkspacePanel panel={resolved.panel} />
+                                            },
                                         }
                                     },
                                     ':action(signals|reindex)': {
