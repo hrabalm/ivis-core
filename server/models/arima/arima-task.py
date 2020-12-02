@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 import pmdarima as pm
+import pandas as pd
 from pmdarima.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 import datetime as dt
@@ -162,7 +163,7 @@ def estimate_end_ts(first_ts, interval, buckets_count):
     Warning: This is only approximate estimation and end_ts doesn't coincide with a respective
     bucket end! Last bucket should therefore be ignored."""
     start_date = dt.datetime.strptime(first_ts, pythondateformat)
-    
+
 
     markers = {
         'y': dt.timedelta(days=365),
@@ -191,7 +192,7 @@ def estimate_end_ts(first_ts, interval, buckets_count):
 
 
 def read_ts_test(es, index_name, ts_name, value_name, start_ts, sample_interval, agg_method, buckets_count):
-    
+
     approx_end_ts = estimate_end_ts(start_ts, sample_interval, buckets_count)
     query = {
         "query": {"range": {ts_name: {"gte": start_ts, "lt": approx_end_ts}}},
@@ -248,11 +249,28 @@ def read_ts_resampled2(es, index_name, ts_name, value_name, start_ts='', aggrega
             break
 
     linear_interp(vs)
-    
+
     return (ts, vs)
 
 
+def plot_dummy(writers):
+    from matplotlib import pyplot as plt
+    from matplotlib.ticker import AutoLocator
+    from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
 
+    plt.figure()
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(AutoLocator())
+    ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d'))
+
+    colors = ['blue', 'red', 'green', 'cyan']
+    for i, w in enumerate(writers):
+        print(w.ts)
+        print(w.ds)
+        plt.plot(w.ts, w.ds, c=colors[i])
+        plt.fill_between(w.ts, [x[0] for x in w.cis], [x[1] for x in w.cis], alpha=0.05, color=colors[i])
+
+    plt.show()
 
 
 class SARIMAXWrapper:
@@ -325,7 +343,7 @@ class TSReader:
 
     def read_new(self):
         """ read new records
-        
+
         returns (data, ts)
         """
         pass
@@ -345,7 +363,7 @@ class DummyReader:
             return []
 
         return self.ds, self.ts
-        
+
 
 class PredWriter:
     def __init__(self, ivis, namespace, signal_set_name, signal_set_desc):
@@ -356,11 +374,14 @@ class PredWriter:
         self.state = None
 
     def write(self, data, ts, cis=None):  # TODO: Doc <-  data, ts are array-like
-        if not cis:
+        if cis is None:
             cis = [None for x in data]
 
         for i in range(len(data)):
-            _write_pred(data[i], ts[i], cis[i])
+            self._write_pred(data[i], ts[i], cis[i])
+
+    def clear(self):
+        raise NotImplementedError
 
     def _create_output_signal_set(self):
         SIGNALS = {
@@ -424,16 +445,21 @@ class DummyPredWriter:
         self.cis = []
 
     def write(self, data, ts, cis=None):  # TODO: Doc <-  data, ts are array-like
-        self.ds += data
-        self.ts += ts
+        self.ds += list(data)
+        self.ts += list(ts)
 
-        if not cis:
+        if cis is None:
             cis = [None for x in data]
-        self.cis += cis
+        self.cis += list(cis)  # TODO: don't convert to list
+
+    def clear(self):
+        self.ds = []
+        self.ts = []
+        self.cis = []
 
 
 class IVISPredictionModel:
-    def __init__(self, ivis, config):
+    def __init__(self, config, reader, history_writer, future_writer, delta=None):
         self.model = None
         self.sw = None # TODO: Get rid of this
         self.old_observations = None
@@ -441,76 +467,76 @@ class IVISPredictionModel:
         self.new_observations = None
         self.new_observations_ts = None
         self.config = config
+        self.delta = delta
 
-        self.oldest_observation_ts = dt.datetime.min  # Very Long Time Ago
+        self.newest_observation_ts = dt.datetime.min  # Very Long Time Ago
 
         self.period = None # Period between observations, exact if agg, otherwise avg or median of those between training data obvsvs
-        
+
         self.rmses = None  # array of rmses (paired with old observations)
         self.rmse = None
 
-        self.ivis = ivis
-
-        self.ss_history_name = "" # name of signal set for old (in-sample) predictions
-        self.ss_ahead_name = ""   # name of signal set for predictions into future
+        self.reader = reader
+        self.history_writer = history_writer
+        self.future_writer = future_writer
 
     def initialize(self):  # first run
-        self._create_output_signal_sets()
-
         # load training data
         self._get_new_observations()
         self._train_new_model()  # train the model on training data only
-        
-        # TODO: append test data
 
-        # calculate predictions on all 'history' data
-        #self._calculate_history_predictions()
+        # calculate delta if necessary
+        self._calculate_delta()
+
+        # TODO: append test data
+        self._calculate_ahead_predictions()
 
         # compute RMSE
 
     def update_on_new_observations(self):  # subsequent runs
-        
+
         # load new observations
+        self._get_new_observations()
 
-        # append observations to the trained model
+        # append observations to the trained model, update history data
+        self._update_model()
 
-        # update history data
-
-        # update RMSE
-
-        # update ivis state (if running in ivis)
-
-        # plot if running locally
-
-        pass
+        # TODO: update RMSE
 
     def check_config(self):
         pass
 
+    def _calculate_delta(self):
+        if (self.delta is None):
+            ts = self.old_observations_ts
+            deltas = []
+            for i in range(len(ts) - 1):
+                d = pd.Timestamp(ts[i + 1]).to_pydatetime() - pd.Timestamp(ts[i]).to_pydatetime()
+                deltas.append(d)
+            #print("deltas:", deltas)
+            self.delta = deltas[len(deltas)//2] # approx median
+
     def _get_new_observations(self):
         """Get all new (not yet seen) observations from elastic search"""
-        #self.new_observations  # new_observations should be empty now # TODO: Assert
+        # new_observations should be empty, because at the end of each iteration,
+        # they are supposed to be maked old
+        assert (self.new_observations is None and self.new_observations_ts is None)
 
-        ts, ds = read_ts(self.ivis.elasticsearch,
-                         self.config['index_name'],
-                         self.config['ts_name'],
-                         self.config['value_name'],
-                         aggregation=self.config['aggregation'],
-                         start_ts=self.oldest_observation_ts,
-                         sample_interval=self.config['sample_interval'])
-        
+        ds, ts = self.reader.read_new()
+
+        # TODO: This should be moved to aggregation abstract reader
         # Ignore the last observation if 'now' intersects with it's bucket (when agg is used)
-        now = dt.datetime.now()
-        if False: # TODO
-            # throw away the last member
-            ts = ts[:-1]
-            ds = ds[:-1]
+        #now = dt.datetime.now()
+        #if False: # TODO
+        #    # throw away the last member
+        #    ts = ts[:-1]
+        #    ds = ds[:-1]
 
         self.new_observations = ds
         self.new_observations_ts = ts
 
         # Store ts of last observation (so that we know where to start in next interation)
-        self.oldest_observation_ts = ts[-1]
+        self.newest_observation_ts = ts[-1]
 
     def _train_new_model(self):
         train_size = int(self.config['train_portion']
@@ -518,10 +544,11 @@ class IVISPredictionModel:
         train_data, test_data = train_test_split(
             self.new_observations, train_size=train_size)
         train_ts, test_ts = train_test_split(
-            self.new_observations, train_size=train_size)
+            self.new_observations_ts, train_size=train_size)
 
         sw = SARIMAXWrapper()
         sw.create_model(self.config, train_data)
+        self.sw = sw # TODO: Remove
 
         self.model = sw.model  # TODO: Don't use SARIMAXWrapper
         print(self.model.summary())
@@ -545,6 +572,8 @@ class IVISPredictionModel:
         pred, pred_ci = self.sw.add_new_obs(self.new_observations)
         pred_ts = self.new_observations_ts
 
+        self.history_writer.write(pred, pred_ts, pred_ci)
+
         self.old_observations += self.new_observations
         self.old_observations_ts += self.new_observations_ts
 
@@ -553,169 +582,106 @@ class IVISPredictionModel:
 
 
     def _calculate_ahead_predictions(self):
-        pass
+        self.future_writer.clear() # delete old future predictions
 
-    def _upload_history_predictions(self, pred, pred_ci, pred_ts):
-        pass
+        ahead_count = 5
+        pred, ci = self.model.predict(ahead_count, return_conf_int=True)
+        ts = self._estimate_future_timestamps(ahead_count)
+        self.future_writer.write(pred, ts, ci)
 
-    def _estimate_future_timestamps(self):
-        pass
+    def _estimate_future_timestamps(self, count):
+        ts = []
+        c = pd.Timestamp(self.newest_observation_ts).to_pydatetime()
+        print(c, self.delta)
+        for x in range(count):
+            c = c + self.delta
+            ts.append(c)
+        return ts
 
     def _update_rmse(self):
         pass
 
-    def _create_output_signal_sets(self): # TODO: Remove
-        namespace = "" # TODO
 
-        SIGNALS = {}
 
-        self.history_state = self.ivis.create_signal_set(
-            self.ss_history_name, namespace, name="In-sample ARIMA predictions", description="In-sample ARIMA predictions", record_id_template=None, signals=SIGNALS)
+def main():
+    IVIS = False
 
-        self.ahead_state = self.ivis.create_signal_set(
-            self.ss_ahead_name, namespace, name="Future ARIMA predictions", description="Future ARIMA predictions", record_id_template=None, signals=SIGNALS)
+    reader = DummyReader()  # move up
+    history_writer = DummyPredWriter()
+    future_writer = DummyPredWriter()
+    state = None
 
-    def _write_pred(self, state, ssname, pred, pred_ci, pred_ts):
-        for i in range(len(pred)):
-            doc = {
-                state[ssname]['fields']['ci_max']: pred_ci[i, 0],
-                state[ssname]['fields']['predicted_value']: pred[i],
-                state[ssname]['fields']['ci_min']: pred_ci[i, 1],
-                state[ssname]['fields']['ts']: pred_ts[i],
-            }
+    if IVIS:
+        from ivis import ivis
+        from elasticsearch import Elasticsearch
+        import elasticsearch.helpers as eshelp
 
-            res = self.ivis.elasticsearch.index(
-                index=state[ssname]['index'], doc_type='_doc', body=doc)
+        es = ivis.elasticsearch
+        state = ivis.state
+        params = ivis.parameters
+        entities = ivis.entities
 
-    
+        sig_set = entities['signalSets'][params['sigSet']]
+        ts = entities['signals'][params['sigSet']][params['ts']]
+        values = entities['signals'][params['sigSet']][params['source']]
+        ns = sig_set['namespace']
+    else:
+        # Try loading saved model
+        try:
+            state = joblib.load("model_state.xz")
+        except:
+            state = None
 
-def __ivis_main__():
-    from ivis import ivis
-    from elasticsearch import Elasticsearch
-    import elasticsearch.helpers as eshelp
+        # TODO: Create proper reader and writers (es backend)
 
-    es = ivis.elasticsearch
-    state = ivis.state
-    params = ivis.parameters
-    entities = ivis.entities
-
-    sig_set = entities['signalSets'][params['sigSet']]
-    ts = entities['signals'][params['sigSet']][params['ts']]
-    values = entities['signals'][params['sigSet']][params['source']]
-
-    if state is not None:
+    if state is not None: # reuse the old model
         # get model from state
         # look for new values
         # get new predictions
-        pass
-    else:
-        ivis_model = IVISPredictionModel(ivis, {})  # TODO: Config
-        
+        ivis_model = state['ivis_model']
+        ivis_model.update_on_new_observations()
+        print("Trying to update")
+         #print(state)
+    else: # new model
+        # TODO: Handle config
+        arima_config = {
+            'auto': True,
+            'seasonal': False,
+            'train_portion': 0.75,
 
+            'max_p': 5,
+            'max_d': 2,
+            'max_q': 5,
+            'd': 0,
+        }
+
+        ivis_model = IVISPredictionModel(arima_config, reader, history_writer, future_writer)
+
+        #input_config['index_name'] = sig_set['index']
+        #input_config['ts_name'] = ts['field']
+        #input_config['value_name'] = values['field']
+        #input_config['seasonality'] = params['seasonality']
+        # load training and test data
+        #ts, ds = read_ts(es,
+        #                input_config['index_name'],
+        #                input_config['ts_name'],
+        #                input_config['value_name'],
+        #                aggregation=input_config['aggregation'],
+        #                start_ts=input_config['start_ts'],
+        #                sample_interval=input_config['sample_interval'])
 
         ivis_model.initialize()
 
+        plot_dummy([history_writer, future_writer])
 
-        input_config['index_name'] = sig_set['index']
-        input_config['ts_name'] = ts['field']
-        input_config['value_name'] = values['field']
-        input_config['seasonality'] = params['seasonality']
-        # load training and test data
-        ts, ds = read_ts(es,
-                        input_config['index_name'],
-                        input_config['ts_name'],
-                        input_config['value_name'],
-                        aggregation=input_config['aggregation'],
-                        start_ts=input_config['start_ts'],
-                        sample_interval=input_config['sample_interval'])
+        # TODO: Save model
+        new_state = { 'ivis_model': ivis_model }
+        if IVIS:
+            pass # TODO
+        else:
+            joblib.dump(new_state, "model_state.xz")
+            #joblib.dump(new_state, "model_state.bin") # uncompresses
 
-        print(len(ts))
-
-        # convert ts from string to datetime
-        ts = [dt.datetime.strptime(x, pythondateformat) for x in ts]
-
-        train_size = int(input_config['train_portion']*len(ds))
-        train_data, test_data = train_test_split(ds, train_size=train_size)
-        train_ts, test_ts = train_test_split(ts, train_size=train_size)
-
-        sw = SARIMAXWrapper()
-        sw.create_model(input_config, train_data)
-
-        model = sw.model
-
-        print(model.summary())
-        print(model.get_params())
-        print(model.params())
-        print(model.to_dict())
-
-        # temporary predictions
-        predictions, ci = model.predict(len(test_data), return_conf_int=True)
-        in_sample, ins_ci = sw.add_new_obs(test_data)
-
-        #joblib.dump(sw, "test.bin")
-        ns = sig_set['namespace']
-        outsignals = []
-
-        outsignals.append({
-            "cid": "ts",
-            "name": "ts",
-            "description": "ts",
-            "namespace": ns,
-            "type": "date",
-            "indexed": True,
-            "settings": {}
-        })
-        outsignals.append({
-            "cid": "predicted_value",
-            "name": "predicted_value",
-            "description": "predicted_value",
-            "namespace": ns,
-            "type": "double",
-            "indexed": False,
-            "settings": {}
-        })
-        outsignals.append({
-            "cid": "ci_max",
-            "name": "ci_max",
-            "description": "ci_max",
-            "namespace": ns,
-            "type": "double",
-            "indexed": False,
-            "settings": {}
-        })
-        outsignals.append({
-            "cid": "ci_min",
-            "name": "ci_min",
-            "description": "ci_min",
-            "namespace": ns,
-            "type": "double",
-            "indexed": False,
-            "settings": {}
-        })
-
-        ssname = input_config['index_name'] + "_arima" # TODO: Unique identifier
-        try:
-            query_content = {'match_all': {}}
-            aquery = {
-                'query': query_content
-            }
-            es.delete_by_query(
-                index=ssname, body=aquery)
-            #es.indices.delete(index=ssname)
-        except:
-            pass
-        state = ivis.create_signal_set(
-            ssname, ns, ssname, ssname, None, outsignals)
-
-        for i in range(len(in_sample)):
-            doc = {
-                state[ssname]['fields']['ci_max']: ins_ci[i, 0],
-                state[ssname]['fields']['predicted_value']: in_sample[i],
-                state[ssname]['fields']['ci_min']: ins_ci[i, 1],
-                state[ssname]['fields']['ts']: test_ts[i],
-            }
-            res = es.index(index=state[ssname]
-                           ['index'], doc_type='_doc', body=doc)
 
 
 if __name__ == "__main__":
@@ -725,9 +691,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    if not args.localtest:
-        __ivis_main__()
-    else:
+    main()
+
+    #if not args.localtest:
+    #    __ivis_main__()
+    #else:
         #__test_main__()
-        pass
+    #    pass
 
