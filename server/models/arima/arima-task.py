@@ -10,9 +10,9 @@ import joblib
 import argparse
 
 #esdateformat = "yyyy-MM-dd'T'HH:mm:ss:SS"  # TODO: Remove SS?
-esdateformat = "yyyy-MM-dd'T'HH:mm:ss"
+#esdateformat = "yyyy-MM-dd'T'HH:mm:ss"
 #pythondateformat = "%Y-%m-%dT%H:%M:%S:00"
-pythondateformat = "%Y-%m-%dT%H:%M:%S"
+#pythondateformat = "%Y-%m-%dT%H:%M:%S"
 esdateformat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
 pythondateformat = "%Y-%m-%dT%H:%M:%S.000Z"
 
@@ -35,7 +35,7 @@ input_config = {
     # 'end_ts': '', # TODO: might be useless?
     'train_portion': 0.75,
     'auto': True,
-    'seasonal': True,
+    'seasonal': False,
     'm': 12, # seasonal_m
     'max_p': 5,
     'max_d': 2,
@@ -54,9 +54,9 @@ input_config = {
     'mprediction_name': '',
 }
 
-arima_params = ['seasonal', 'm', 'p', 'q', 'P', 'Q']
-autoarima_params = ['seasonal', 'm', 'max_p', 'max_d', 'max_q']
-global_params = {'error_action': 'ignore', 'maxiter': 50, 'trace': True}
+#arima_params = ['seasonal', 'm', 'p', 'q', 'P', 'Q']
+#autoarima_params = ['seasonal', 'm', 'max_p', 'max_d', 'max_q']
+#global_params = {'error_action': 'ignore', 'maxiter': 50, 'trace': True}
 
 
 
@@ -93,9 +93,9 @@ def read_ts_directly(es, index_name, ts_name, value_name, start_ts=''):
         'sort': {ts_name: 'asc'}
     }
 
-    if start_ts != '':
+    if start_ts is not None and start_ts != '':
         query['query'] = {}  # we don't want to match_all after all
-        query['query']['range'] = {ts_name: {'gte': start_ts}}
+        query['query']['range'] = {ts_name: {'gt': start_ts}} # used to be gte TODO: Check
 
     #es = Elasticsearch()
     # elasticsearch6-py might have a bug: skipped shards are counted as unsuccessful - fixed in 7+?
@@ -146,9 +146,10 @@ def read_ts_resampled(es, index_name, ts_name, value_name, start_ts='', aggregat
 def get_first_ts(es, index_name, ts_name, start_ts=''):
     query = {'size': 1,
              'sort': {ts_name: 'asc'}}  # we only need the first record
-    if start_ts == '':
+    if start_ts is None or start_ts == '':
         query['query'] = {'match_all': {}}
     else:
+        query['query'] = {}
         query['query']['range'] = {ts_name: {'gte': start_ts}}
     results = es.search(index=index_name, body=query)
 
@@ -304,6 +305,8 @@ class SARIMAXWrapper:
             if input_config['d'] != None:
                 parameters['d'] = input_config['d']
 
+            print(train_data)
+            print(parameters)
             self.model = pm.auto_arima(train_data, **parameters)
         else:
             if input_config['seasonal']:
@@ -337,16 +340,71 @@ class SARIMAXWrapper:
 
 # buffered, have to call sync after last write
 
-class TSReader:
-    def __init__(self, ivis):
-        pass
+class ElasticReader:
+    def __init__(self, es, index_name, ts_name, value_name, min_ts=None):
+        self.latest_observation_ts = dt.datetime.min  # Long time ago
+        
+        self.es = es
+        self.index_name = index_name
+        self.ts_name = ts_name
+        self.value_name = value_name
+        
+        if min_ts is not None:
+            self.latest_observation_ts = min_ts
+
+    def read_new(self): # TODO: Check overlap
+        """ Get new observations from elastic search
+
+        returns (data, ts)
+        """
+        ts, ds = read_ts(self.es,
+                         self.index_name,
+                         self.ts_name,
+                         self.value_name,
+                         self.latest_observation_ts,
+                         aggregation=False)
+
+        if len(ts) > 0:
+            self.latest_observation_ts = ts[-1]
+
+        return ds, ts
+
+
+class ElasticAggReader:
+    def __init__(self, es, index_name, ts_name, value_name, agg='1M', agg_type='avg', min_ts=None):
+        self.latest_observation_ts = dt.datetime.min  # Long time ago
+
+        self.es = es
+        self.index_name = index_name
+        self.ts_name = ts_name
+        self.value_name = value_name
+
+        self.agg = agg
+        self.agg_type = agg_type
+        
+        if min_ts is not None:
+            self.latest_observation_ts = min_ts
 
     def read_new(self):
         """ read new records
 
         returns (data, ts)
         """
-        pass
+        ts, ds = read_ts(self.es,
+                         self.index_name,
+                         self.ts_name,
+                         self.value_name,
+                         self.latest_observation_ts,
+                         aggregation=True,
+                         sample_interval=self.agg,
+                         agg_method=self.agg_type)
+
+        # remove last element if 'now' intersects with its bucket
+
+        if len(ts) > 0:
+            self.latest_observation_ts = ts[-1]
+
+        return ds, ts
 
 
 class DummyReader:
@@ -356,6 +414,7 @@ class DummyReader:
 
         self.ts = [x[0] for x in ds.data]
         self.ds = [x[1] for x in ds.data]
+        self.ds, self.ts = self._filter_nan(self.ds, self.ts)
         self.read = False
 
     def read_new(self):
@@ -363,6 +422,15 @@ class DummyReader:
             return []
 
         return self.ds, self.ts
+
+    def _filter_nan(self, ds, ts):
+        nds, nts = [], []
+        for d, t in zip(ds, ts):
+            if not np.isnan(d):
+                nds.append(d)
+                nts.append(t)
+        return nds, nts
+
 
 
 class PredWriter:
@@ -372,6 +440,8 @@ class PredWriter:
         self.signal_set_desc = signal_set_desc
         self.namespace = namespace
         self.state = None
+
+        self._create_output_signal_set()
 
     def write(self, data, ts, cis=None):  # TODO: Doc <-  data, ts are array-like
         if cis is None:
@@ -384,7 +454,7 @@ class PredWriter:
         raise NotImplementedError
 
     def _create_output_signal_set(self):
-        SIGNALS = {
+        SIGNALS = [
             {
                 "cid": "ts",
                 "name": "ts",
@@ -421,12 +491,12 @@ class PredWriter:
                 "indexed": False,
                 "settings": {}
             }
-        }
+        ]
 
         self.state = self.ivis.create_signal_set(self.signal_set_name, self.namespace, self.signal_set_name, self.signal_set_desc, signals=SIGNALS)
 
     def _write_pred(self, pred, ts, ci):
-        if not ci:
+        if ci is None:
             ci = (None, None)
         doc = {
             self.state[self.signal_set_name]['fields']['ci_max']: ci[0],
@@ -513,7 +583,6 @@ class IVISPredictionModel:
             for i in range(len(ts) - 1):
                 d = pd.Timestamp(ts[i + 1]).to_pydatetime() - pd.Timestamp(ts[i]).to_pydatetime()
                 deltas.append(d)
-            #print("deltas:", deltas)
             self.delta = deltas[len(deltas)//2] # approx median
 
     def _get_new_observations(self):
@@ -523,14 +592,6 @@ class IVISPredictionModel:
         assert (self.new_observations is None and self.new_observations_ts is None)
 
         ds, ts = self.reader.read_new()
-
-        # TODO: This should be moved to aggregation abstract reader
-        # Ignore the last observation if 'now' intersects with it's bucket (when agg is used)
-        #now = dt.datetime.now()
-        #if False: # TODO
-        #    # throw away the last member
-        #    ts = ts[:-1]
-        #    ds = ds[:-1]
 
         self.new_observations = ds
         self.new_observations_ts = ts
@@ -592,7 +653,7 @@ class IVISPredictionModel:
     def _estimate_future_timestamps(self, count):
         ts = []
         c = pd.Timestamp(self.newest_observation_ts).to_pydatetime()
-        print(c, self.delta)
+        #print(c, self.delta)
         for x in range(count):
             c = c + self.delta
             ts.append(c)
@@ -604,7 +665,7 @@ class IVISPredictionModel:
 
 
 def main():
-    IVIS = False
+    IVIS = True
 
     reader = DummyReader()  # move up
     history_writer = DummyPredWriter()
@@ -625,14 +686,28 @@ def main():
         ts = entities['signals'][params['sigSet']][params['ts']]
         values = entities['signals'][params['sigSet']][params['source']]
         ns = sig_set['namespace']
+
+        input_config['index_name'] = sig_set['index']
+        input_config['ts_name'] = ts['field']
+        input_config['value_name'] = values['field']
+        input_config['seasonal'] = params['seasonality']
+
+        if state is None:
+            if input_config['aggregation']:
+                reader = ElasticAggReader(
+                    es, input_config['index_name'], input_config['ts_name'], input_config['value_name'], input_config['sample_interval'], input_config['agg_method']) # TODO: min_ts
+            else:
+                reader = ElasticReader(
+                    es, input_config['index_name'], input_config['ts_name'], input_config['value_name'])  # TODO: min_ts
+            name = params['sigSet'] + dt.datetime.now().strftime(pythondateformat)
+            history_writer = PredWriter(ivis, ns, name + "_hist", "")
+            future_writer = PredWriter(ivis, ns, name + "_futr", "")
     else:
         # Try loading saved model
         try:
             state = joblib.load("model_state.xz")
         except:
             state = None
-
-        # TODO: Create proper reader and writers (es backend)
 
     if state is not None: # reuse the old model
         # get model from state
@@ -641,34 +716,12 @@ def main():
         ivis_model = state['ivis_model']
         ivis_model.update_on_new_observations()
         print("Trying to update")
-         #print(state)
     else: # new model
-        # TODO: Handle config
-        arima_config = {
-            'auto': True,
-            'seasonal': False,
-            'train_portion': 0.75,
-
-            'max_p': 5,
-            'max_d': 2,
-            'max_q': 5,
-            'd': 0,
-        }
+        # TODO: Handle config using aux function
+        # to_copy = ['auto', 'seasonal', 'train_portion', '']
+        arima_config = input_config
 
         ivis_model = IVISPredictionModel(arima_config, reader, history_writer, future_writer)
-
-        #input_config['index_name'] = sig_set['index']
-        #input_config['ts_name'] = ts['field']
-        #input_config['value_name'] = values['field']
-        #input_config['seasonality'] = params['seasonality']
-        # load training and test data
-        #ts, ds = read_ts(es,
-        #                input_config['index_name'],
-        #                input_config['ts_name'],
-        #                input_config['value_name'],
-        #                aggregation=input_config['aggregation'],
-        #                start_ts=input_config['start_ts'],
-        #                sample_interval=input_config['sample_interval'])
 
         ivis_model.initialize()
 
@@ -689,7 +742,7 @@ if __name__ == "__main__":
     parser.add_argument("--localtest", default=False, action="store_true", help="Local testing mode")
 
     args = parser.parse_args()
-    print(args)
+    #print(args)
 
     main()
 
