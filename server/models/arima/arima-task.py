@@ -8,11 +8,9 @@ import datetime as dt
 import dateutil as du
 import joblib
 import argparse
+import io
+import base64
 
-#esdateformat = "yyyy-MM-dd'T'HH:mm:ss:SS"  # TODO: Remove SS?
-#esdateformat = "yyyy-MM-dd'T'HH:mm:ss"
-#pythondateformat = "%Y-%m-%dT%H:%M:%S:00"
-#pythondateformat = "%Y-%m-%dT%H:%M:%S"
 esdateformat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
 pythondateformat = "%Y-%m-%dT%H:%M:%S.000Z"
 
@@ -22,7 +20,7 @@ def str2datetime(s):
 def datetime2str(ts): # TODO
     return ""
 
-deltas = {'M': None}
+#deltas = {'M': None}
 
 input_config = {
     'index_name': 'mhn-co2', # es index containing obervations
@@ -57,8 +55,6 @@ input_config = {
 #arima_params = ['seasonal', 'm', 'p', 'q', 'P', 'Q']
 #autoarima_params = ['seasonal', 'm', 'max_p', 'max_d', 'max_q']
 #global_params = {'error_action': 'ignore', 'maxiter': 50, 'trace': True}
-
-
 
 def linear_interp(data):  # interpolation of empty buckets
     # there should be no empty buckets on both sides
@@ -369,6 +365,16 @@ class ElasticReader:
 
         return ds, ts
 
+    def __getstate__(self):
+        new_state = self.__dict__.copy()
+        if 'es' in new_state:
+            del new_state['es']
+        return new_state
+
+    def __setstate__(self, data):
+        self.__dict__ = data
+        self.es = ivis.elasticsearch
+
 
 class ElasticAggReader:
     def __init__(self, es, index_name, ts_name, value_name, agg='1M', agg_type='avg', min_ts=None):
@@ -406,6 +412,16 @@ class ElasticAggReader:
 
         return ds, ts
 
+    def __getstate__(self):
+        new_state = self.__dict__.copy()
+        if 'es' in new_state:
+            del new_state['es']
+        return new_state
+
+    def __setstate__(self, data):
+        self.__dict__ = data
+        self.es = ivis.elasticsearch
+
 
 class DummyReader:
     def __init__(self):
@@ -435,13 +451,13 @@ class DummyReader:
 
 class PredWriter:
     def __init__(self, ivis, namespace, signal_set_name, signal_set_desc):
-        self.ivis = ivis
+        self.es = ivis.elasticsearch
         self.signal_set_name = signal_set_name
         self.signal_set_desc = signal_set_desc
         self.namespace = namespace
         self.state = None
 
-        self._create_output_signal_set()
+        self._create_output_signal_set(ivis)
 
     def write(self, data, ts, cis=None):  # TODO: Doc <-  data, ts are array-like
         if cis is None:
@@ -451,9 +467,11 @@ class PredWriter:
             self._write_pred(data[i], ts[i], cis[i])
 
     def clear(self):
-        raise NotImplementedError
+        query = {'query': {'match_all': {}}}
+        self.es.delete_by_query(
+            index=self.state[self.signal_set_name]['index'], body=query)
 
-    def _create_output_signal_set(self):
+    def _create_output_signal_set(self, ivis):
         SIGNALS = [
             {
                 "cid": "ts",
@@ -493,7 +511,7 @@ class PredWriter:
             }
         ]
 
-        self.state = self.ivis.create_signal_set(self.signal_set_name, self.namespace, self.signal_set_name, self.signal_set_desc, signals=SIGNALS)
+        self.state = ivis.create_signal_set(self.signal_set_name, self.namespace, self.signal_set_name, self.signal_set_desc, signals=SIGNALS)
 
     def _write_pred(self, pred, ts, ci):
         if ci is None:
@@ -505,7 +523,17 @@ class PredWriter:
             self.state[self.signal_set_name]['fields']['ts']: ts,
         }
 
-        res = self.ivis.elasticsearch.index(index=self.state[self.signal_set_name]['index'], doc_type='_doc', body=doc)
+        res = self.es.index(index=self.state[self.signal_set_name]['index'], doc_type='_doc', body=doc)
+
+    def __getstate__(self):
+        new_state = self.__dict__.copy()
+        if 'es' in new_state:
+            del new_state['es']
+        return new_state
+
+    def __setstate__(self, data):
+        self.__dict__ = data
+        self.es = ivis.elasticsearch
 
 
 class DummyPredWriter:
@@ -725,15 +753,17 @@ def main():
 
         ivis_model.initialize()
 
-        plot_dummy([history_writer, future_writer])
+        if not IVIS:
+            plot_dummy([history_writer, future_writer])
 
-        # TODO: Save model
+        # Save model
         new_state = { 'ivis_model': ivis_model }
         if IVIS:
-            pass # TODO
+            f = io.BytesIO()
+            joblib.dump(new_state, f, compress=('xz', 6))
+            ivis.store_state(base64.b64encode(f.getvalue()))
         else:
             joblib.dump(new_state, "model_state.xz")
-            #joblib.dump(new_state, "model_state.bin") # uncompresses
 
 
 
