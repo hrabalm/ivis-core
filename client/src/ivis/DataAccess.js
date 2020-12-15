@@ -620,7 +620,7 @@ class DataAccess {
     }
 
     processHistogramResults(responseData, sigSetCid, signals) {
-        const processBucketsRecursive = function(bucket) {
+        const processBucketsRecursive = function (bucket) {
             let agg;
             if (bucket.aggs && bucket.aggs.length > 0) {
                 agg = bucket.aggs[0];
@@ -663,7 +663,7 @@ class DataAccess {
 
 
     /*
-        aggs = [ { sigCid, agg_type } ]
+        aggs = [ { sigCid, agg_type, <parameters of the aggregation> } ]
     */
     getAggsQueries(sigSetCid, filter, aggs) {
         const qry = {
@@ -758,7 +758,7 @@ export class DataAccessSession {
     }
 
     async _getLatestOne(type, ...args) {
-        const results = await this._getLatestMultiple(type, [{ type, args }]);
+        const results = await this._getLatestMultiple(type, [{type, args}]);
         if (results) {
             return results[0];
         } else {
@@ -784,6 +784,14 @@ export class DataAccessSession {
 
     async getLatestDocs(sigSetCid, signals, filter, sort, limit) {
         return await this._getLatestOne('docs', sigSetCid, signals, filter, sort, limit);
+    }
+
+    async getLatestSummary(sigSetCid, filter, summary) {
+        return await this._getLatestOne('summary', sigSetCid, filter, summary);
+    }
+
+    async getLatestAggs(sigSetCid, filter, aggs) {
+        return await this._getLatestOne('aggs', sigSetCid, filter, aggs);
     }
 
     async getLatestMixed(queries) {
@@ -921,6 +929,71 @@ export class TimeSeriesPointProvider extends Component {
         return (
             <TimeSeriesDataProvider
                 fetchDataFun={async (dataAccessSession, intervalAbsolute) => await dataAccessSession.getLatestTimeSeriesPoint(this.props.signalSets, this.props.tsSpec.getTs(intervalAbsolute), this.props.tsSpec.pointType)}
+                renderFun={this.props.renderFun}
+                loadingRenderFun={this.props.loadingRenderFun}
+            />
+        );
+    }
+}
+
+export class TimeSeriesLimitedPointsProvider extends Component {
+    static propTypes = {
+        signalSets: PropTypes.object.isRequired,
+        limit: PropTypes.number.isRequired,
+        renderFun: PropTypes.func.isRequired,
+        loadingRenderFun: PropTypes.func
+    }
+
+    async fetchDataFun(dataAccessSession, intervalAbsolute) {
+        const queries = [];
+        const sigSets = Object.keys(this.props.signalSets);
+
+
+        for (const sigSetCid of sigSets) {
+            const sigSet = this.props.signalSets[sigSetCid];
+            const tsSig = getTsSignalCid(sigSet);
+
+            const filter = {
+                type: 'and',
+                children: [
+                    {
+                        type: 'range',
+                        sigCid: tsSig,
+                        [TimeSeriesPointType.LTE]: moment().toISOString()
+                    }
+                ]
+            }
+
+            const signals = [tsSig, ...sigSet.signals];
+
+            const sort = [
+                {
+                    sigCid: tsSig,
+                    order: 'desc'
+                },
+            ];
+
+            queries.push({type: 'docs', args: [sigSetCid, signals, filter, sort, this.props.limit]});
+        }
+
+        const results = await dataAccessSession.getLatestMixed(queries);
+
+        const data = {};
+
+        if (results) {
+            results.forEach((result, i) => {
+                data[sigSets[i]] = result;
+            })
+        }
+
+        return data;
+    }
+
+    render() {
+
+        return (
+            <TimeSeriesDataProvider
+                fetchDataFun={::this.fetchDataFun}
                 renderFun={this.props.renderFun}
                 loadingRenderFun={this.props.loadingRenderFun}
             />

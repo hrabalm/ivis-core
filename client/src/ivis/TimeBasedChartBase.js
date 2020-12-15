@@ -19,6 +19,8 @@ import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
 import {AreZoomTransformsEqual, ConfigDifference, setZoomTransform, transitionInterpolate, WheelDelta} from "./common";
 import * as d3Zoom from "d3-zoom";
+import commonStyles from "./commons.scss";
+import timeBasedChartBaseStyles from "./TimeBasedChartBase.scss";
 
 export function createBase(base, self) {
     self.base = base;
@@ -61,7 +63,8 @@ class TooltipContent extends Component {
                             if (sigVals) {
                                 rows.push(
                                     <div key={`${sigSetIdx} ${sigIdx}`}>
-                                        <span className={tooltipStyles.signalColor} style={{color: sigConf.color}}><Icon icon="minus"/></span>
+                                        <span className={tooltipStyles.signalColor} style={{color: sigConf.color}}><Icon
+                                            icon="minus"/></span>
                                         <span className={tooltipStyles.signalLabel}>{sigConf.label}:</span>
                                         {this.props.getSignalValues(this, sigSetConf, sigConf, sigSetConf.cid, sigConf.cid, sel.data[sigConf.cid], isAgg)}
                                     </div>
@@ -163,7 +166,7 @@ function compareConfigs(conf1, conf2, customComparator) {
     intervalAccessMixin()
 ])
 export class TimeBasedChartBase extends Component {
-    constructor(props){
+    constructor(props) {
         super(props);
 
         const t = props.t;
@@ -450,6 +453,7 @@ export class TimeBasedChartBase extends Component {
         if (renderStatus === RenderStatus.NO_DATA && this.state.statusMsg === "")
             this.setState({statusMsg: t('No data.')});
     }
+
     setInterval(from, to) {
         const intv = this.getInterval();
 
@@ -493,9 +497,10 @@ export class TimeBasedChartBase extends Component {
             if (!Object.is(d3Event.transform, d3Zoom.zoomIdentity))
                 if (self.props.zoomUpdateReloadInterval > 0) {
                     clearTimeout(self.zoomUpdateReloadTimeoutID);
-                    self.zoomUpdateReloadTimeoutID = setTimeout(() => {self.setInterval(...self.xScaleDomain)}, self.props.zoomUpdateReloadInterval);
-                }
-                else if (self.props.zoomUpdateReloadInterval >= 0)
+                    self.zoomUpdateReloadTimeoutID = setTimeout(() => {
+                        self.setInterval(...self.xScaleDomain)
+                    }, self.props.zoomUpdateReloadInterval);
+                } else if (self.props.zoomUpdateReloadInterval >= 0)
                     self.setInterval(...self.xScaleDomain);
         };
 
@@ -510,17 +515,24 @@ export class TimeBasedChartBase extends Component {
             .on("zoom", handleZoom)
             .on("end", handleZoomEnd)
             .on("start", handleZoomStart)
-            .wheelDelta(WheelDelta(3));
+            .wheelDelta(WheelDelta(3))
+            .filter(() => {
+                if (d3Event.type === "wheel" && !d3Event.shiftKey)
+                    return false;
+                return !d3Event.ctrlKey && !d3Event.button;
+            });
         this.containerNodeSelection.call(this.zoom);
         if (!zoomExisted)
             this.resetZoom(); // this is called after data are reloaded
     }
+
     setZoom(transform) {
         if (this.props.withZoom && this.zoom)
             this.containerNodeSelection.call(this.zoom.transform, transform);
         else
             this.setState({zoomTransform: transform})
     }
+
     resetZoom() {
         this.setZoom(d3Zoom.zoomIdentity);
     }
@@ -531,7 +543,9 @@ export class TimeBasedChartBase extends Component {
         if (!this.state.signalSetsData) {
             return (
                 <svg ref={node => this.containerNode = node} height={this.props.height} width="100%">
-                    <text textAnchor="middle" x="50%" y="50%" fontFamily="'Open Sans','Helvetica Neue',Helvetica,Arial,sans-serif" fontSize="14px">
+                    <text textAnchor="middle" x="50%" y="50%"
+                          fontFamily="'Open Sans','Helvetica Neue',Helvetica,Arial,sans-serif" fontSize="14px"
+                          fill="currentColor">
                         {this.state.statusMsg}
                     </text>
                 </svg>
@@ -559,43 +573,55 @@ export class TimeBasedChartBase extends Component {
             } else if (this.props.contentRender) {
                 tooltipExtraProps.contentRender = tooltipContentRender;
             } else {
-                tooltipExtraProps.contentRender = (props) => <TooltipContent getSignalValues={this.props.getSignalValuesForDefaultTooltip} {...props}/>;
+                tooltipExtraProps.contentRender = (props) => <TooltipContent
+                    getSignalValues={this.props.getSignalValuesForDefaultTooltip} {...props}/>;
             }
 
 
             return (
-                <svg id="cnt" ref={node => {this.containerNode = node; this.containerNodeSelection = select(node)}} height={this.props.height} width="100%">
+                <svg id="cnt" ref={node => {
+                    this.containerNode = node;
+                    this.containerNodeSelection = select(node)
+                }} height={this.props.height} width="100%">
                     {this.props.getSvgDefs(this)}
                     <defs>
                         <clipPath id="plotRect">
-                            <rect x="0" y="0" width={this.state.width - this.props.margin.left - this.props.margin.right} height={this.props.height - this.props.margin.top - this.props.margin.bottom} />
+                            <rect x="0" y="0"
+                                  width={this.state.width - this.props.margin.left - this.props.margin.right}
+                                  height={this.props.height - this.props.margin.top - this.props.margin.bottom}/>
                         </clipPath>
                     </defs>
-                    <g transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`} clipPath="url(#plotRect)" ref={node => this.GraphContentSelection = select(node)}>
+                    <g transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}
+                       clipPath="url(#plotRect)" ref={node => this.GraphContentSelection = select(node)}>
                         {(!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.loading) &&
-                            <rect width={"100%"} height={"100%"} fill={"#e5e5e5"} />}
+                        <rect className={timeBasedChartBaseStyles.loadingOverlay}/>}
                         {this.props.getGraphContent(this)}
                     </g>
-                    <g ref={node => this.xAxisSelection = select(node)} transform={`translate(${this.props.margin.left}, ${this.props.height - this.props.margin.bottom})`}/>
-                    <g ref={node => this.yAxisSelection = select(node)} transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}/>
-                    <line ref={node => this.cursorSelection = select(node)} strokeWidth="1" stroke="rgb(50,50,50)" visibility="hidden"/>
+                    <g ref={node => this.xAxisSelection = select(node)}
+                       transform={`translate(${this.props.margin.left}, ${this.props.height - this.props.margin.bottom})`}/>
+                    <g ref={node => this.yAxisSelection = select(node)}
+                       transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}/>
+                    <line ref={node => this.cursorSelection = select(node)} className={commonStyles.cursorLine}
+                          visibility="hidden"/>
                     <text textAnchor="middle" x="50%" y="50%"
-                          fontFamily="'Open Sans','Helvetica Neue',Helvetica,Arial,sans-serif" fontSize="14px">
+                          fontFamily="'Open Sans','Helvetica Neue',Helvetica,Arial,sans-serif" fontSize="14px"
+                          fill="currentColor">
                         {this.state.statusMsg}
                     </text>
                     {this.props.withTooltip &&
-                        <Tooltip
-                            config={this.props.config.signalSets}
-                            signalSetsData={this.state.signalSetsData}
-                            containerHeight={this.props.height}
-                            containerWidth={this.state.width}
-                            mousePosition={this.state.mousePosition}
-                            selection={this.state.selection}
-                            {...tooltipExtraProps}
-                        />
+                    <Tooltip
+                        config={this.props.config.signalSets}
+                        signalSetsData={this.state.signalSetsData}
+                        containerHeight={this.props.height}
+                        containerWidth={this.state.width}
+                        mousePosition={this.state.mousePosition}
+                        selection={this.state.selection}
+                        {...tooltipExtraProps}
+                    />
                     }
                     {content}
-                    <g ref={node => this.brushSelection = select(node)} transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}/>
+                    <g ref={node => this.brushSelection = select(node)}
+                       transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}/>
                 </svg>
             );
         }

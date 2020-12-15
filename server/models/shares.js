@@ -451,6 +451,8 @@ function throwPermissionDenied(data) {
     throw new interoperableErrors.PermissionDeniedError(`Permission denied${permissionDeniedAdditionalInfo(data)}`, data);
 }
 function permissionDeniedAdditionalInfo(data) {
+    if (data === undefined)
+        return "";
     if (data.sigSetCid)
         return ` (sigSetCid: "${data.sigSetCid}")`;
     else if (data.sigCid)

@@ -22,6 +22,7 @@ import {Icon} from "../lib/bootstrap-components";
 import {AreZoomTransformsEqual, brushHandlesLeftRight, brushHandlesTopBottom, ConfigDifference, drawBars, getColorScale, setZoomTransform, TimeIntervalDifference, transitionInterpolate, WheelDelta, ZoomEventSources} from "./common";
 import styles from "./CorrelationCharts.scss";
 import {PropType_d3Color} from "../lib/CustomPropTypes";
+import StatusMsg from "./StatusMsg";
 
 function compareConfigs(conf1, conf2) {
     let diffResult = ConfigDifference.NONE;
@@ -57,17 +58,17 @@ class TooltipContent extends Component {
             if (xStep !== undefined) { // NUMBER
                 const xKeyF = d3Format.format("." + d3Format.precisionFixed(xStep) + "f");
                 xDescription = <div>X axis range: <Icon icon="chevron-left"/>{xKeyF(bucket.xKey)} <Icon icon="ellipsis-h"/> {xKeyF(bucket.xKey + xStep)}<Icon icon="chevron-right"/></div>
-            }
-            else // KEYWORD
+            } else { // KEYWORD
                 xDescription = <div>X axis: {bucket.xKey}</div>;
+            }
 
             let yDescription;
             if (yStep !== undefined) { // NUMBER
                 const yKeyF = d3Format.format("." + d3Format.precisionFixed(yStep) + "f");
                 yDescription = <div>Y axis range: <Icon icon="chevron-left"/>{yKeyF(bucket.key)} <Icon icon="ellipsis-h"/> {yKeyF(bucket.key + yStep)}<Icon icon="chevron-right"/></div>
-            }
-            else // KEYWORD
+            } else { // KEYWORD
                 yDescription = <div>Y axis: {bucket.key}</div>;
+            }
 
             const probF = d3Format.format(".2f");
 
@@ -98,7 +99,7 @@ const DataType = {
     intervalAccessMixin()
 ], ["getView", "setView"], ["processBucket", "prepareData", "getKeywordExtent", "getKeys"])
 export class HeatmapChart extends Component {
-    constructor(props){
+    constructor(props) {
         super(props);
 
         const t = props.t;
@@ -187,7 +188,7 @@ export class HeatmapChart extends Component {
     };
 
     static defaultProps = {
-        margin: { left: 40, right: 5, top: 5, bottom: 20 },
+        margin: {left: 40, right: 5, top: 5, bottom: 20},
         minRectWidth: 40,
         minRectHeight: 40,
         withTooltip: true,
@@ -209,9 +210,9 @@ export class HeatmapChart extends Component {
         zoomLevelMax: 4,
 
         overviewBottomHeight: 60,
-        overviewBottomMargin: { top: 0, bottom: 20 },
+        overviewBottomMargin: {top: 0, bottom: 20},
         overviewLeftWidth: 70,
-        overviewLeftMargin: { left: 30, right: 0 }
+        overviewLeftMargin: {left: 30, right: 0}
     };
     static defaultColors = ["#ffffff", "#1c70ff"]; // default value for props.config.colors
 
@@ -232,8 +233,9 @@ export class HeatmapChart extends Component {
             configDiff = Math.max(configDiff, TimeIntervalDifference(this, prevProps));
 
         // test if limits changed
-        if (!Object.is(prevProps.xMinValue, this.props.xMinValue) || !Object.is(prevProps.xMaxValue, this.props.xMaxValue) || !Object.is(prevProps.yMinValue, this.props.yMinValue) || !Object.is(prevProps.yMaxValue, this.props.yMaxValue))
+        if (!Object.is(prevProps.xMinValue, this.props.xMinValue) || !Object.is(prevProps.xMaxValue, this.props.xMaxValue) || !Object.is(prevProps.yMinValue, this.props.yMinValue) || !Object.is(prevProps.yMaxValue, this.props.yMaxValue)) {
             configDiff = Math.max(configDiff, ConfigDifference.DATA_WITH_CLEAR);
+        }
 
         if (prevState.maxBucketCountX !== this.state.maxBucketCountX ||
             prevState.maxBucketCountY !== this.state.maxBucketCountY) {
@@ -248,8 +250,7 @@ export class HeatmapChart extends Component {
                 // noinspection JSIgnoredPromiseFromCall
                 this.fetchData();
             });
-        }
-        else if (configDiff === ConfigDifference.DATA) {
+        } else if (configDiff === ConfigDifference.DATA) {
             // noinspection JSIgnoredPromiseFromCall
             this.fetchData();
         } else {
@@ -381,9 +382,9 @@ export class HeatmapChart extends Component {
             bucket.metric = bucket.values[config.metric_sigCid][config.metric_type];
             delete bucket.values;
             return bucket.metric;
-        }
-        else
+        } else {
             return bucket.count;
+        }
     }
 
     /**
@@ -441,16 +442,16 @@ export class HeatmapChart extends Component {
             if (!isNaN(props.yMinValue)) yMin = props.yMinValue;
             if (!isNaN(props.yMaxValue)) yMax = props.yMaxValue;
             yExtent = [yMin, yMax];
-        }
-        else { // yType === DataType.KEYWORD
+        } else { // yType === DataType.KEYWORD
             yExtent = HeatmapChart.getKeywordExtent(data.buckets);
             yExtent.sort((a, b) => a.localeCompare(b));
             // add missing inner buckets
             for (const bucket of data.buckets) {
                 const innerKeys = HeatmapChart.getKeys(bucket.buckets);
                 for (const key of yExtent)
-                    if (innerKeys.indexOf(key) === -1)
-                        bucket.buckets.push({ key: key, count: 0 });
+                    if (innerKeys.indexOf(key) === -1) {
+                        bucket.buckets.push({key: key, count: 0});
+                    }
                 // sort inner buckets so they are in same order in all outer buckets
                 bucket.buckets.sort((a, b) => a.key.localeCompare(b.key));
             }
@@ -469,7 +470,9 @@ export class HeatmapChart extends Component {
             }
 
         // calculate probabilities of buckets
-        const rowProbs = data.buckets[0].buckets.map((b, i) => { return {key: b.key, prob: 0, index: i}; });
+        const rowProbs = data.buckets[0].buckets.map((b, i) => {
+            return {key: b.key, prob: 0, index: i};
+        });
         for (const column of data.buckets) {
             for (const [i, bucket] of column.buckets.entries()) {
                 bucket.prob = bucket.value / totalValue;
@@ -481,7 +484,7 @@ export class HeatmapChart extends Component {
 
         if (yType === DataType.KEYWORD) {
             // sort inner buckets by rowProbs
-            rowProbs.sort((a,b) => b.prob - a.prob); // smallest to biggest prob
+            rowProbs.sort((a, b) => b.prob - a.prob); // smallest to biggest prob
             const permuteKeys = rowProbs.map(d => d.index);
             yExtent = d3Array.permute(yExtent, permuteKeys);
             for (const column of data.buckets)
@@ -810,8 +813,9 @@ export class HeatmapChart extends Component {
             .translateExtent(translateExtent)
             .extent(zoomExtent)
             .filter(() => {
-                // noinspection JSUnresolvedVariable
-                return !d3Selection.event.ctrlKey && !d3Selection.event.button && !this.state.brushInProgress;
+                if (d3Event.type === "wheel" && !d3Event.shiftKey)
+                    return false;
+                return !d3Event.ctrlKey && !d3Event.button && !this.state.brushInProgress;
             })
             .on("zoom", handleZoom)
             .on("end", handleZoomEnd)
@@ -862,8 +866,7 @@ export class HeatmapChart extends Component {
                 newBrushLeft[1] = this.defaultBrushLeft[1];
                 updated = true;
             }
-        }
-        else {
+        } else {
             updated = true;
             if (!this.props.withZoomX) {
                 newBrushBottom = this.brushBottomValues || this.defaultBrushBottom;
@@ -923,8 +926,7 @@ export class HeatmapChart extends Component {
     }
 
     callViewChangeCallback() {
-        if (typeof(this.props.viewChangeCallback) !== "function")
-            return;
+        if (typeof (this.props.viewChangeCallback) !== "function") return;
 
         this.props.viewChangeCallback(this, this.getView(), this.lastZoomCausedByUser);
     }
@@ -1005,7 +1007,7 @@ export class HeatmapChart extends Component {
         // ensure that brush is not outside the extent
         if (this.brushLeftValues && (this.brushLeftValues[0] < this.defaultBrushLeft[0] || this.brushLeftValues[1] > this.defaultBrushLeft[1]))
             this.overviewLeftBrushSelection.call(this.brushLeft.move, [Math.max(this.brushLeftValues[0], this.defaultBrushLeft[0]), Math.min(this.brushLeftValues[1], this.defaultBrushLeft[1])]);
-        
+
         this.overviewLeftBrushSelection.select(".selection")
             .classed(styles.selection, true);
         this.overviewLeftBrushSelection.select(".overlay")
@@ -1113,22 +1115,21 @@ export class HeatmapChart extends Component {
         if (!this.state.signalSetData) {
             return (
                 <svg ref={node => this.containerNode = node} height={this.props.height} width="100%"
-                     className={this.props.className} style={this.props.style} >
-                    <text textAnchor="middle" x="50%" y="50%"
-                          fontFamily="'Open Sans','Helvetica Neue',Helvetica,Arial,sans-serif" fontSize="14px">
+                     className={this.props.className} style={this.props.style}>
+                    <StatusMsg>
                         {this.state.statusMsg}
-                    </text>
+                    </StatusMsg>
                 </svg>
             );
 
         } else {
 
             return (
-                <div className={this.props.className} style={this.props.style} >
+                <div className={this.props.className} style={this.props.style}>
                     {this.props.withOverviewLeft &&
                     <svg id="overview_left"
                          height={this.props.height}
-                         width={this.props.overviewLeftWidth} >
+                         width={this.props.overviewLeftWidth}>
                         <g transform={`translate(${this.props.overviewLeftMargin.left}, ${this.props.margin.top})`}>
                             <g ref={node => this.overviewLeftBarsSelection = select(node)}/>
                         </g>
@@ -1139,41 +1140,50 @@ export class HeatmapChart extends Component {
                            className={styles.brush}/>
                     </svg>}
                     <div ref={node => this.svgContainerSelection = select(node)} className={styles.touchActionNone}
-                         style={{ width: this.props.withOverviewLeft ? `calc(100% - ${this.props.overviewLeftWidth}px)` : "100%", height: this.props.height, display: "inline-block"}} >
+                         style={{
+                             width: this.props.withOverviewLeft ? `calc(100% - ${this.props.overviewLeftWidth}px)` : "100%",
+                             height: this.props.height,
+                             display: "inline-block"
+                         }}>
                         <svg id="cnt" ref={node => this.containerNode = node} height={"100%"} width={"100%"}>
                             <defs>
                                 <clipPath id="plotRect">
-                                    <rect x="0" y="0" width={this.state.width - this.props.margin.left - this.props.margin.right} height={this.props.height - this.props.margin.top - this.props.margin.bottom} />
+                                    <rect x="0" y="0"
+                                          width={this.state.width - this.props.margin.left - this.props.margin.right}
+                                          height={this.props.height - this.props.margin.top - this.props.margin.bottom}/>
                                 </clipPath>
                                 <clipPath id="leftAxis">
-                                    <rect x={-this.props.margin.left + 1} y={0} width={this.props.margin.left} height={this.props.height - this.props.margin.top - this.props.margin.bottom + 6} /* 6 is default size of axis ticks, so we can add extra space in the bottom left corner for this axis and still don't collide with the other axis. Thanks to this, the first tick text should not be cut in half. */ />
+                                    <rect x={-this.props.margin.left + 1} y={0} width={this.props.margin.left}
+                                          height={this.props.height - this.props.margin.top - this.props.margin.bottom + 6} /* 6 is default size of axis ticks, so we can add extra space in the bottom left corner for this axis and still don't collide with the other axis. Thanks to this, the first tick text should not be cut in half. */ />
                                 </clipPath>
                                 <clipPath id="bottomAxis">
-                                    <rect x={-6} y={0} width={this.state.width - this.props.margin.left - this.props.margin.right + 6} height={this.props.margin.bottom} /* same reason for 6 as above */ />
+                                    <rect x={-6} y={0}
+                                          width={this.state.width - this.props.margin.left - this.props.margin.right + 6}
+                                          height={this.props.margin.bottom} /* same reason for 6 as above */ />
                                 </clipPath>
                             </defs>
-                            <g transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`} clipPath="url(#plotRect)" >
+                            <g transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}
+                               clipPath="url(#plotRect)">
                                 <g ref={node => this.columnsSelection = select(node)}/>
                                 {!this.state.zoomInProgress &&
-                                    <g ref={node => this.highlightSelection = select(node)}/>}
+                                <g ref={node => this.highlightSelection = select(node)}/>}
                             </g>
 
                             {/* axes */}
                             <g ref={node => this.xAxisSelection = select(node)}
                                transform={`translate(${this.props.margin.left}, ${this.props.height - this.props.margin.bottom})`}
-                               clipPath="url(#bottomAxis)" />
+                               clipPath="url(#bottomAxis)"/>
                             <text ref={node => this.xAxisLabelSelection = select(node)}
-                                  transform={`translate(${this.props.margin.left + (this.state.width - this.props.margin.left - this.props.margin.right) / 2}, ${this.props.height - 5})`} />
+                                  transform={`translate(${this.props.margin.left + (this.state.width - this.props.margin.left - this.props.margin.right) / 2}, ${this.props.height - 5})`}/>
                             <g ref={node => this.yAxisSelection = select(node)}
                                transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}
                                clipPath="url(#leftAxis)"/>
                             <text ref={node => this.yAxisLabelSelection = select(node)}
-                                  transform={`translate(${15}, ${this.props.margin.top + (this.props.height - this.props.margin.top - this.props.margin.bottom) / 2}) rotate(-90)`} />
+                                  transform={`translate(${15}, ${this.props.margin.top + (this.props.height - this.props.margin.top - this.props.margin.bottom) / 2}) rotate(-90)`}/>
 
-                            <text textAnchor="middle" x="50%" y="50%"
-                                  fontFamily="'Open Sans','Helvetica Neue',Helvetica,Arial,sans-serif" fontSize="14px">
+                            <StatusMsg>
                                 {this.state.statusMsg}
-                            </text>
+                            </StatusMsg>
                             {this.props.withTooltip && !this.state.zoomInProgress &&
                             <Tooltip
                                 config={this.props.config}
@@ -1199,7 +1209,7 @@ export class HeatmapChart extends Component {
                     <svg id="overview_bottom"
                          style={{marginLeft: this.props.withOverviewLeft ? this.props.overviewLeftWidth : 0}}
                          height={this.props.overviewBottomHeight}
-                         width={ this.props.withOverviewLeft ? `calc(100% - ${this.props.overviewLeftWidth}px)` : "100%"} >
+                         width={this.props.withOverviewLeft ? `calc(100% - ${this.props.overviewLeftWidth}px)` : "100%"}>
                         <g transform={`translate(${this.props.margin.left}, ${this.props.overviewBottomMargin.top})`}>
                             <g ref={node => this.overviewBottomBarsSelection = select(node)}/>
                         </g>

@@ -66,7 +66,6 @@ module.exports.tryAuthByRestrictedAccessToken = (req, res, next) => {
     });
 };
 
-
 module.exports.setupRegularAuth = app => {
     app.use(passport.initialize());
     app.use(passport.session());

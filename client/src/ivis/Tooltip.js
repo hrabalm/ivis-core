@@ -3,8 +3,12 @@
 import React, {Component} from "react";
 import PropTypes from "prop-types";
 import styles from "./Tooltip.scss";
+import {ThemeContext} from "../lib/theme-context";
+import {Theme} from "../../../shared/themes"
 
 export class Tooltip extends Component {
+    static contextType = ThemeContext;
+
     constructor(props) {
         super(props);
 

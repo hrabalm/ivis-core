@@ -23,8 +23,8 @@ const indexerExec = em.get('indexer.elasticsearch.exec', path.join(__dirname, '.
 const indexer = require('./elasticsearch-common');
 const knex = require('../../lib/knex');
 
-const events = require('events');
-const emitter = new events.EventEmitter();
+const {emitter, EventTypes}= require('../elasticsearch-events');
+
 
 let indexerProcess;
 
@@ -58,7 +58,7 @@ async function init() {
                     return startedCallback();
                 case 'index':
                     if (msg.cid) {
-                        emitter.emit('index', msg.cid);
+                        emitter.emit(EventTypes.INDEX, msg.cid);
                     }
                     break;
             }
@@ -196,7 +196,7 @@ async function onInsertRecords(sigSetWithSigMap, records) {
         await elasticsearch.bulk({body: bulk});
     }
 
-    emitter.emit('insert', sigSetWithSigMap.cid);
+    emitter.emit(EventTypes.INSERT, sigSetWithSigMap.cid);
     return {};
 }
 
@@ -233,7 +233,7 @@ async function onUpdateRecord(sigSetWithSigMap, existingRecordId, record) {
         body: esDoc
     });
 
-    emitter.emit('update', sigSetWithSigMap.cid);
+    emitter.emit(EventTypes.UPDATE, sigSetWithSigMap.cid);
     return {};
 }
 
@@ -253,7 +253,7 @@ async function onRemoveRecord(sigSet, recordId) {
         }
     }
 
-    emitter.emit('remove', sigSet.cid);
+    emitter.emit(EventTypes.REMOVE, sigSet.cid);
     return {};
 }
 

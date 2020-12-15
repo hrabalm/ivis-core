@@ -72,7 +72,7 @@ export class LineChart extends Component {
         config: PropTypes.object.isRequired,
         contentComponent: PropTypes.func,
         contentRender: PropTypes.func,
-        onClick: PropTypes.func,
+        onClick: PropTypes.func, // FIXME: should this be passed to the LineChartBase?
         height: PropTypes.number,
         margin: PropTypes.object,
         withTooltip: PropTypes.bool,
@@ -91,6 +91,7 @@ export class LineChart extends Component {
         compareConfigs: PropTypes.func,
         lineVisibility: PropTypes.func,
         lineCurve: PropTypes.func,
+        lineWidth: PropTypes.number,
 
         controlTimeIntervalChartWidth: PropTypes.bool
     }
@@ -199,6 +200,7 @@ export class LineChart extends Component {
                 tooltipContentRender={this.props.tooltipContentRender}
                 tooltipExtraProps={this.props.tooltipExtraProps}
                 lineVisibility={this.props.lineVisibility}
+                lineWidth={this.props.lineWidth}
                 controlTimeIntervalChartWidth={this.props.controlTimeIntervalChartWidth}
                 lineCurve={this.props.lineCurve}
             />

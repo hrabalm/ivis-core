@@ -650,6 +650,7 @@ export const panelConfigMixin = createComponentMixin({
 
             self.state._panelConfig = Immutable.Map({
                 params: Immutable.fromJS(props.params),
+                templateParams: Immutable.fromJS(props.panel.templateParams),
                 state: Immutable.fromJS(props.state || {}),
                 savePermitted: false
             });
@@ -786,6 +787,19 @@ export const panelConfigMixin = createComponentMixin({
 
         inst.getPanelConfig = function (path = []) {
             const value = this.state._panelConfig.getIn(['params', ...path]);
+            if (Immutable.isImmutable(value)) {
+                return value.toJS();
+            } else {
+                return value;
+            }
+        };
+
+        /**
+         * Gets the specification of template parameters.
+         * It can be used for example in 'configSpec' parameter of 'Legend'. Example of usage can be found in '/examples/templates/scatterplot_legend' template.
+         */
+        inst.getPanelConfigSpec = function (path = []) {
+            const value = this.state._panelConfig.getIn(['templateParams', ...path]);
             if (Immutable.isImmutable(value)) {
                 return value.toJS();
             } else {

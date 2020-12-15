@@ -9,13 +9,14 @@ import {withTranslation} from "../lib/i18n";
 import {PropType_d3Color, PropType_d3Color_Required} from "../lib/CustomPropTypes";
 import {StaticBarChart} from "./BarChart";
 import {FrequencyDataLoader} from "./FrequencyDataLoader";
+import StatusMsg from "./StatusMsg";
 
 @withComponentMixins([
     withTranslation,
     withErrorHandling
 ])
 export class FrequencyBarChart extends Component {
-    constructor(props){
+    constructor(props) {
         super(props);
 
         const t = props.t;
@@ -71,8 +72,7 @@ export class FrequencyBarChart extends Component {
                 data: null,
                 statusMsg: this.props.t('No data.')
             });
-        }
-        else {
+        } else {
             let bars = data.buckets.map((b, i) => {
                 return {
                     label: this.props.getLabel(b.key, b.count),
@@ -87,7 +87,7 @@ export class FrequencyBarChart extends Component {
                     value: data.sum_other_doc_count
                 });
             this.setState({
-                data: { bars }
+                data: {bars}
             });
         }
     }
@@ -97,9 +97,9 @@ export class FrequencyBarChart extends Component {
         if (!this.state.data) {
             chart = (
                 <svg ref={node => this.containerNode = node} height={this.props.height} width="100%">
-                    <text textAnchor="middle" x="50%" y="50%" fontFamily="'Open Sans','Helvetica Neue',Helvetica,Arial,sans-serif" fontSize="14px">
+                    <StatusMsg>
                         {this.state.statusMsg}
-                    </text>
+                    </StatusMsg>
                 </svg>
             );
 
@@ -120,7 +120,10 @@ export class FrequencyBarChart extends Component {
         }
         return (
             <div className={this.props.className} style={this.props.style}>
-                <FrequencyDataLoader ref={(node) => this.dataLoader = node} config={this.props.config} processData={::this.processData} maxBucketCount={this.props.maxBucketCount} />
+                <FrequencyDataLoader ref={(node) => this.dataLoader = node}
+                                     config={this.props.config}
+                                     processData={::this.processData}
+                                     maxBucketCount={this.props.maxBucketCount}/>
                 {chart}
             </div>
         );

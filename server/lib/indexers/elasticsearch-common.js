@@ -20,7 +20,8 @@ const fieldTypes = {
     [SignalType.BOOLEAN]: 'boolean',
     [SignalType.KEYWORD]: 'keyword',
     [SignalType.TEXT]: 'text',
-    [SignalType.DATE_TIME]: 'date'
+    [SignalType.DATE_TIME]: 'date',
+    [SignalType.JSON]: 'object',
 };
 
 async function createIndex(sigSet, signalByCidMap) {

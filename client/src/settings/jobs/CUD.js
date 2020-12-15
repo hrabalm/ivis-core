@@ -29,7 +29,7 @@ import {getJobStates} from './states';
 import {JobState} from "../../../../shared/jobs";
 import moment from "moment";
 import ParamTypes from "../ParamTypes"
-import axios from "axios";
+import axios from '../../lib/axios';
 import {getUrl} from "../../lib/urls";
 import {withComponentMixins} from "../../lib/decorator-helpers";
 import {withTranslation} from "../../lib/i18n";

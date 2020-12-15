@@ -73,6 +73,7 @@ const aggHandlers = {
         getAgg: field => ({
             percentiles: {
                 percents: aggSpec.percents,
+                keyed: aggSpec.hasOwnProperty("keyed") ? aggSpec.keyed : true,
                 ...field
             }
         }),
@@ -796,6 +797,14 @@ class QueryProcessor {
             return {
                 wildcard: {
                     [elsFld.field]: flt.value
+                }
+            }
+        } else if (flt.type === 'terms') {
+            const field = signalMap[flt.sigCid];
+            const elsFld = this.getField(field);
+            return {
+                terms: {
+                    [elsFld.field]: flt.values
                 }
             }
         } else if (flt.type === 'ids') {

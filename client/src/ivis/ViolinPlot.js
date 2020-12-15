@@ -21,6 +21,7 @@ import {AreZoomTransformsEqual, ConfigDifference, isInExtent, setZoomTransform, 
 import {Icon} from "../lib/bootstrap-components";
 import * as d3Format from "d3-format";
 import * as d3Zoom from "d3-zoom";
+import commonStyles from "./commons.scss";
 
 function compareConfigs(conf1, conf2) {
     let diffResult = ConfigDifference.NONE;
@@ -814,7 +815,12 @@ export class ViolinPlot extends Component {
             .on("zoom", handleZoom)
             .on("end", handleZoomEnd)
             .on("start", handleZoomStart)
-            .wheelDelta(WheelDelta(2));
+            .wheelDelta(WheelDelta(2))
+            .filter(() => {
+                if (d3Event.type === "wheel" && !d3Event.shiftKey)
+                    return false;
+                return !d3Event.ctrlKey && !d3Event.button;
+            });
         this.svgContainerSelection.call(this.zoom);
     }
 
@@ -931,7 +937,7 @@ export class ViolinPlot extends Component {
 
                         {/* cursor line */}
                         {!this.state.zoomInProgress &&
-                        <line ref={node => this.cursorSelection = select(node)} strokeWidth="1" stroke="rgb(50,50,50)" visibility="hidden"/>}
+                        <line ref={node => this.cursorSelection = select(node)} className={commonStyles.cursorLine} visibility="hidden"/>}
 
                         {/* status message */}
                         <text textAnchor="middle" x="50%" y="50%" fontFamily="'Open Sans','Helvetica Neue',Helvetica,Arial,sans-serif" fontSize="14px">

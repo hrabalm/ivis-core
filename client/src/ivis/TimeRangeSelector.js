@@ -26,6 +26,8 @@ import _
 import {IntervalSpec} from "./TimeInterval";
 import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
+import {ThemeContext} from "../lib/theme-context";
+import {Theme} from "../../../shared/themes"
 
 @withComponentMixins([
     withTranslation,
@@ -33,6 +35,8 @@ import {withTranslation} from "../lib/i18n";
     intervalAccessMixin()
 ])
 export class TimeRangeSelector extends Component {
+    static contextType = ThemeContext;
+
     constructor(props, context) {
         super(props, context);
 
@@ -416,19 +420,20 @@ export class TimeRangeSelector extends Component {
     render() {
         const t = this.props.t;
 
+        let cls = `card ${styles.timeRangeSelector}`;
         // FIXME:
         // - add timezone selection
         return (
-            <div className="card">
-                <div className="card-header" onClick={() => this.setState({ opened: !this.state.opened })}>
+            <div className={cls}>
+                <div className={`card-header ${styles.header}`} onClick={() => this.setState({ opened: !this.state.opened })}>
                     <div className={styles.headingDescription}>{this.getDescription()}</div>
                     <div className={styles.headingButtons}>
                         <ActionLink onClickAsync={async () => this.setState({ opened: !this.state.opened })}><Icon icon="sliders-h" title={t('Open time settings')}/></ActionLink>
                         <ActionLink onClickAsync={async () => this.getInterval().goBack()}><Icon icon="chevron-left" title={t('Go back')}/></ActionLink>
                         <ActionLink onClickAsync={async () => this.getInterval().goForward()}><Icon icon="chevron-right" title={t('Go forward')}/></ActionLink>
                         <ActionLink onClickAsync={async () => this.getInterval().refresh()}><Icon icon="redo" title={t('Refresh')}/></ActionLink>
-                        <ActionLink onClickAsync={async () => this.zoom(0.5)}><Icon icon="search-plus" title={t('Zoom in')}/></ActionLink>
-                        <ActionLink onClickAsync={async () => this.zoom(2)}><Icon icon="search-minus" title={t('Zoom out')}/></ActionLink>
+                        <ActionLink className={styles.cursorZoomIn} onClickAsync={async () => this.zoom(0.5)}><Icon icon="search-plus" title={t('Zoom in')}/></ActionLink>
+                        <ActionLink className={styles.cursorZoomOut} onClickAsync={async () => this.zoom(2)}><Icon icon="search-minus" title={t('Zoom out')}/></ActionLink>
                         <ActionLink onClickAsync={async () => this.move(-0.8)}><Icon icon="arrow-left" title={t('Move left')}/></ActionLink>
                         <ActionLink onClickAsync={async () => this.move(0.8)}><Icon icon="arrow-right" title={t('Move right')}/></ActionLink>
                     </div>
