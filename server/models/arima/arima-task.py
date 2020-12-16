@@ -517,9 +517,9 @@ class PredWriter:
         if ci is None:
             ci = (None, None)
         doc = {
-            self.state[self.signal_set_name]['fields']['ci_max']: ci[0],
+            self.state[self.signal_set_name]['fields']['ci_max']: ci[1],
             self.state[self.signal_set_name]['fields']['predicted_value']: pred,
-            self.state[self.signal_set_name]['fields']['ci_min']: ci[1],
+            self.state[self.signal_set_name]['fields']['ci_min']: ci[0],
             self.state[self.signal_set_name]['fields']['ts']: ts,
         }
 
@@ -761,7 +761,7 @@ def main():
         if IVIS:
             f = io.BytesIO()
             joblib.dump(new_state, f, compress=('xz', 6))
-            ivis.store_state(base64.b64encode(f.getvalue()))
+            ivis.store_state(base64.b64encode(f.getvalue()).decode("utf-8"))
         else:
             joblib.dump(new_state, "model_state.xz")
 
