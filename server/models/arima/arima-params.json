@@ -22,7 +22,7 @@
     "signalSetRef": "sigSet"
   },
   {
-    "id": "seasonality",
+    "id": "isSeasonal",
     "help": "Should SARIMA be used?",
     "type": "boolean",
     "label": "Seasonality"
@@ -32,6 +32,12 @@
     "help": "Number of observations per season.",
     "type": "number",
     "label": "Seasonality m"
+  },
+  {
+    "id": "futurePredictions",
+    "help": "How many predictions into the future do we want to generate?",
+    "type": "number",
+    "label": "Future predictions"
   },
   {
     "id": "resampling",

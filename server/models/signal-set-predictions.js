@@ -21,13 +21,31 @@ async function listDTAjax(context, sigSetId, params) {
         builder => builder
             .from('predictions') 
             .where('sigSetId', sigSetId),
-        ['predictions.sigSetId', 'predictions.name'],//['sigSetId', 'name'],
+        ['predictions.id', 'predictions.sigSetId', 'predictions.name', 'predictions.type'],//['sigSetId', 'name'],
     )
 }
 
+async function createPrediction(sigSetId, jobId, name) {
+    return await knex.transaction(async tx => {
+        const prediction = {
+            sigSetId: sigSetId,
+            name: name,
+            jobId: jobId,
+            type: "arima", // TODO
+            
+        }
+        const id = await tx('predictions').insert(prediction);
+
+        return id;
+    });
+}
+
 async function createArimaModelTx(tx, context, sigSetId, params) {
+    console.log('context:');
     console.log(context);
+    console.log('sigSetId:');
     console.log(sigSetId);
+    console.log('params:');
     console.log(params);
 
     const ts = params.ts;
@@ -51,12 +69,12 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
 
     console.log(jobParams);
 
-    const jobName = `predictions_arima_${signalSet.cid}_test`; // TODO (multiple models per signal set)
-    const modelName = "TestModelName"; // TODO
+    const jobName = `predictions_arima_${signalSet.cid}_${params.name}`; // TODO (multiple models per signal set)
+    const modelName = params.name;
 
     const job = {
         name: jobName,
-        description: `Prediction for model '${modelName}'`,
+        description: `ARIMA for '${signalSet.cid}', '${modelName}'`,
         namespace: signalSet.namespace,
         task: arimaTask.id,
         state: JobState.ENABLED,
@@ -70,6 +88,7 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
     const jobId = await jobs.create(context, job);
 
     // TODO: Register job-model pair
+    createPrediction(sigSetId, jobId, params.name);
 
     // run the job
     jobs.run(context, jobId).catch(error => log.error('signal-set-predictions', error));
