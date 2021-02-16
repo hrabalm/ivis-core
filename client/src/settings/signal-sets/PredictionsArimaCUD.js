@@ -64,7 +64,7 @@ export default class CUD extends Component {
 
         const data = {
             context: {
-                
+
             },
             params: {
                 signalSetId: this.props.signalSet.id,
@@ -149,7 +149,7 @@ export default class CUD extends Component {
                         dataUrl={`rest/signals-table-by-cid/${this.props.signalSet.cid}`}
                         columns={signalColumns}
                     />
-                    
+
                     <TableSelect
                         key="source"
                         id="source"
@@ -174,7 +174,7 @@ export default class CUD extends Component {
                     <CheckBox id="autoarima" label={t('Use auto arima')} />
 
                     <InputField id="futurePredictions" label="Future predictions" help={t('How many predictions into the future do we want to generate?')}/>
-                    
+
                     {autoarima &&
                         <CheckBox id="override_d" label={t('Override d')} help={t('Override the order of differencing (as opposed to estimating it using a differencing test.)')} />
                     }
