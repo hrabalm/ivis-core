@@ -19,7 +19,7 @@ async function listDTAjax(context, sigSetId, params) {
     return await dtHelpers.ajaxList(
         params,
         builder => builder
-            .from('predictions') 
+            .from('predictions')
             .where('sigSetId', sigSetId),
         ['predictions.id', 'predictions.sigSetId', 'predictions.name', 'predictions.type'],//['sigSetId', 'name'],
     )
@@ -32,7 +32,7 @@ async function createPrediction(sigSetId, jobId, name) {
             name: name,
             jobId: jobId,
             type: "arima", // TODO
-            
+
         }
         const id = await tx('predictions').insert(prediction);
 

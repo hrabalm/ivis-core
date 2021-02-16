@@ -340,12 +340,12 @@ class SARIMAXWrapper:
 class ElasticReader:
     def __init__(self, es, index_name, ts_name, value_name, min_ts=None):
         self.latest_observation_ts = dt.datetime.min  # Long time ago
-        
+
         self.es = es
         self.index_name = index_name
         self.ts_name = ts_name
         self.value_name = value_name
-        
+
         if min_ts is not None:
             self.latest_observation_ts = min_ts
 
@@ -388,7 +388,7 @@ class ElasticAggReader:
 
         self.agg = agg
         self.agg_type = agg_type
-        
+
         if min_ts is not None:
             self.latest_observation_ts = min_ts
 
