@@ -50,6 +50,7 @@ input_config = {
     'model_uniq_name': '',
     'oneahead_name': '',
     'mprediction_name': '',
+    'futurePredictions': 5,
 }
 
 #arima_params = ['seasonal', 'm', 'p', 'q', 'P', 'Q']
@@ -673,7 +674,7 @@ class IVISPredictionModel:
     def _calculate_ahead_predictions(self):
         self.future_writer.clear() # delete old future predictions
 
-        ahead_count = 5
+        ahead_count = int(self.config['futurePredictions'])
         pred, ci = self.model.predict(ahead_count, return_conf_int=True)
         ts = self._estimate_future_timestamps(ahead_count)
         self.future_writer.write(pred, ts, ci)
@@ -718,7 +719,16 @@ def main():
         input_config['index_name'] = sig_set['index']
         input_config['ts_name'] = ts['field']
         input_config['value_name'] = values['field']
-        input_config['seasonal'] = params['seasonality']
+        input_config['seasonal'] = params['isSeasonal']
+        input_config['futurePredictions'] = int(params['futurePredictions'])
+
+        if 'autoarima' in params and not params['autoarima']:
+            input_config['p'] = int(params['p'])
+            input_config['d'] = int(params['d'])
+            input_config['q'] = int(params['q'])
+
+        if 'autoarima' in params: # TODO: Rework
+            input_config['auto'] = params['autoarima']
 
         if state is None:
             if input_config['aggregation']:
