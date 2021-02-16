@@ -5,6 +5,7 @@ const dtHelpers = require('../lib/dt-helpers');
 const { JobState } = require("../../shared/jobs");
 const { getBuiltinTask } = require("./builtin-tasks");
 const jobs = require('./jobs');
+const log = require('../lib/log');
 //const { createTx } = require('./signals');
 const { enforce } = require('../lib/helpers');
 
