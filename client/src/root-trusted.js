@@ -487,15 +487,14 @@ const getStructure = t => {
                                     'predictions': {
                                         title: t('Predictions'),
                                         link: params => `/settings/signal-sets/${params.signalSetId}/predictions`,
-                                        visible: true, // TODO: only if ts and sufficient permissions
+                                        visible: resolved => resolved.signalSet.permissions.includes('view') && resolved.signalSet.kind === SignalSetKind.TIME_SERIES,
                                         panelRender: props => <SignalSetPredictions signalSet={props.resolved.signalSet} />, // TODO
                                         children: {
                                             'create-arima': {
                                                 title: t('Add ARIMA model'),
                                                 link: params => `/settings/signal-sets/${params.signalSetId}/predictions/create-arima`,
-                                                //visible: true,
+                                                // visible: resolved => false && resolved, // isn't really shown anywhere
                                                 panelRender: props => <PredictionsArimaCUD signalSet={props.resolved.signalSet} action="create" />
-                                                //panelRender: props => <WorkspacePanel panel={resolved.panel} />
                                             },
                                         }
                                     },
