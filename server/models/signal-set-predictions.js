@@ -25,10 +25,11 @@ async function listDTAjax(context, sigSetId, params) {
     )
 }
 
-async function createPrediction(sigSetId, name, type, namespace) {
+async function createPrediction(context, sigSetId, name, type, namespace) {
     let params = JSON.stringify({
     });
     return await knex.transaction(async tx => {
+        await shares.enforceEntityPermissionTx(tx, context, 'signalSet', sigSetId, 'createPrediction');
         const prediction = {
             sigSetId: sigSetId,
             name: name,
@@ -102,7 +103,7 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
     const jobId = await jobs.create(context, job);
 
     // TODO: Register job-model pair
-    const modelId = await createPrediction(sigSetId, params.name, predictionModels.ARIMA, namespace);
+    const modelId = await createPrediction(context, sigSetId, params.name, predictionModels.ARIMA, namespace);
     let modelParams = await getParamsById(context, modelId);
     modelParams.jobId = jobId;
     await updateParamsById(context, modelId, modelParams);
