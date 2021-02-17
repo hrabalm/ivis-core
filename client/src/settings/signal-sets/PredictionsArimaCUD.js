@@ -151,8 +151,10 @@ export default class CUD extends Component {
             { data: 3, title: t('Description') },
             { data: 4, title: t('Type'), render: data => signalTypes[data] },
         ];
-        //console.log(this.state);
-        //console.log(autoarima);
+
+        // we need deep copy here, because the elements are modified by the form (enclosed in <div></div>)
+        const signalColumns2 = signalColumns.map(x => Object.assign({}, x));
+
         return (
             <Panel title="Add ARIMA model">
                 {/*<ButtonRow>
@@ -183,7 +185,7 @@ export default class CUD extends Component {
                         selectionLabelIndex={2}
                         selectionKeyIndex={1}
                         dataUrl={`rest/signals-table-by-cid/${this.props.signalSet.cid}`}
-                        columns={signalColumns}
+                        columns={signalColumns2}
                     />
 
                     <CheckBox id="useAggregation" label={t('Use bucket aggregation')} />
