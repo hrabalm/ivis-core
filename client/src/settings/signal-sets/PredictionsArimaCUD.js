@@ -9,6 +9,7 @@ import { withComponentMixins } from "../../lib/decorator-helpers";
 import { withTranslation } from "../../lib/i18n";
 import { getSignalTypes } from "../signal-sets/signals/signal-types.js";
 import axios, { HTTPMethod } from '../../lib/axios';
+import { withErrorHandling } from "../../lib/error-handling";
 import { getUrl } from "../../lib/urls";
 import {
     Button,
@@ -28,8 +29,8 @@ import {
 @withComponentMixins([
     withTranslation,
     withForm,
-    //withErrorHandling,
-    //withPageHelpers,
+    withErrorHandling,
+    withPageHelpers,
     requiresAuthenticatedUser
 ])
 export default class CUD extends Component {
@@ -111,6 +112,28 @@ export default class CUD extends Component {
             }
         } catch (error) {
             throw error;
+        }
+    }
+
+    localValidateFormValues(state) { // TODO: finish validation after form is reworked
+        const t = this.props.t;
+
+        if (!state.getIn(['name', 'value'])) {
+            state.setIn(['name', 'error'], t('Name must not be empty'));
+        } else {
+            state.setIn(['name', 'error'], null);
+        }
+
+        if (!state.getIn(['ts', 'value'])) {
+            state.setIn(['ts', 'error'], t('Timestamp must be selected.'));
+        } else {
+            state.setIn(['ts', 'error'], null);
+        }
+
+        if (!state.getIn(['source', 'value'])) {
+            state.setIn(['source', 'error'], t('Source must be selected.'));
+        } else {
+            state.setIn(['source', 'error'], null);
         }
     }
 
