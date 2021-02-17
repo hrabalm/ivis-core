@@ -8,6 +8,7 @@ const jobs = require('./jobs');
 const log = require('../lib/log');
 //const { createTx } = require('./signals');
 const { enforce } = require('../lib/helpers');
+const shares = require('./shares');
 
 const predictionModels = {
     ARIMA: 'arima',
@@ -24,7 +25,7 @@ async function listDTAjax(context, sigSetId, params) {
     )
 }
 
-async function createPrediction(sigSetId, name, type) {
+async function createPrediction(sigSetId, name, type, namespace) {
     let params = JSON.stringify({
     });
     return await knex.transaction(async tx => {
@@ -33,8 +34,14 @@ async function createPrediction(sigSetId, name, type) {
             name: name,
             params: params,
             type: type,
+            namespace: namespace,
         }
         const id = await tx('predictions').insert(prediction);
+
+        await shares.rebuildPermissionsTx(tx, {
+            entityTypeId: 'prediction',
+            entityId: id
+        });
 
         return id;
     });
@@ -42,7 +49,7 @@ async function createPrediction(sigSetId, name, type) {
 
 async function getParamsById(context, id) {
     return await knex.transaction(async tx => {
-        // TODO: enforce permissions
+        await shares.enforceEntityPermissionTx(tx, context, 'prediction', id, 'view');
         const model = await tx('predictions').select(['params']).where('id', id).first();
         return JSON.parse(model.params);
     });
@@ -50,7 +57,7 @@ async function getParamsById(context, id) {
 
 async function updateParamsById(context, id, params) {
     await knex.transaction(async tx => {
-        // TODO: enforce permissions
+        await shares.enforceEntityPermissionTx(tx, context, 'prediction', id, 'edit');
         await tx('predictions').where('id', id).update('params', JSON.stringify(params));
     });
 }
@@ -77,11 +84,12 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
 
     const jobName = `predictions_arima_${signalSet.cid}_${params.name}`; // TODO (multiple models per signal set)
     const modelName = params.name;
+    const namespace = signalSet.namespace;
 
     const job = {
         name: jobName,
         description: `ARIMA for '${signalSet.cid}', '${modelName}'`,
-        namespace: signalSet.namespace,
+        namespace: namespace,
         task: arimaTask.id,
         state: JobState.ENABLED,
         params: jobParams,
@@ -94,7 +102,7 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
     const jobId = await jobs.create(context, job);
 
     // TODO: Register job-model pair
-    const modelId = await createPrediction(sigSetId, params.name, predictionModels.ARIMA);
+    const modelId = await createPrediction(sigSetId, params.name, predictionModels.ARIMA, namespace);
     let modelParams = await getParamsById(context, modelId);
     modelParams.jobId = jobId;
     await updateParamsById(context, modelId, modelParams);
