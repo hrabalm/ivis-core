@@ -90,6 +90,12 @@ const entityTypes = {
     user: {
         entitiesTable: 'users',
         clientLink: ({id}) => `/settings/users/${id}`
+    },
+    prediction: {
+        entitiesTable: 'predictions',
+        sharesTable: 'shares_prediction',
+        permissionsTable: 'permissions_prediction',
+        clientLink: ({id, type, set}) => `/settings/signal-sets/${set}/predictions/${type}/${id}`
     }
 };
 
