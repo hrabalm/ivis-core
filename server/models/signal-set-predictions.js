@@ -15,7 +15,7 @@ const predictionModels = {
     // NAIVE: 'naive',
 };
 
-const allowedKeys = new Set(['name', 'type', 'params', 'namespace', 'sigSetId']);
+const allowedKeys = new Set(['name', 'type', 'params', 'namespace', 'sigSetId', 'signal_cid', 'hist_cid', 'futr_cid']);
 
 function generateHistoryIndexName(signalSetName, modelName, modelType) {
     return [signalSetName, modelName, modelType, 'hist'].join('_');
@@ -38,7 +38,7 @@ async function listDTAjax(context, sigSetId, params) {
         builder => builder
             .from('predictions')
             .where('sigSetId', sigSetId),
-        ['predictions.id', 'predictions.sigSetId', 'predictions.name', 'predictions.type'],
+        ['predictions.id', 'predictions.sigSetId', 'predictions.name', 'predictions.type', 'predictions.signal_cid'],
     )
 }
 
@@ -73,6 +73,16 @@ async function updateParamsById(context, id, params) {
     });
 }
 
+async function getById(context, id) {
+    return await knex.transaction(async tx => {
+        await shares.enforceEntityPermissionTx(tx, context, 'prediction', id, 'view');
+        const entity = await tx('predictions').where('id', id).first();
+        entity.params = JSON.parse(entity.params);
+        // TODO: permissions also?
+        return entity;
+    });
+}
+
 async function createArimaModelTx(tx, context, sigSetId, params) {
     const ts = params.ts;
 
@@ -85,18 +95,23 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
     const tsExists = tx('signals').where({ set: sigSetId, cid: ts }).first();
     enforce(tsExists, `Timestamp signal not found in ${sigSetId}`);
 
-    const jobParams_org = {
-        signalSet: signalSet.cid,
-        sigSet: signalSet.cid,
-        ts: ts,
-    };
-
-    const jobParams = { ...params, ...jobParams_org };
-
     //const jobName = `predictions_arima_${signalSet.cid}_${params.name}`; // TODO (multiple models per signal set)
     const jobName = generateJobName(signalSet.cid, params.name, predictionModels.ARIMA);
     const modelName = params.name;
     const namespace = signalSet.namespace;
+
+    const histCid = generateHistoryIndexName(signalSet.cid, modelName, predictionModels.ARIMA);
+    const futrCid = generateFutureIndexName(signalSet.cid, modelName, predictionModels.ARIMA);
+
+    const jobParams_org = {
+        signalSet: signalSet.cid,
+        sigSet: signalSet.cid,
+        ts: ts,
+        histCid: histCid,
+        futrCid: futrCid,
+    };
+
+    const jobParams = { ...params, ...jobParams_org };
 
     const job = {
         name: jobName,
@@ -120,6 +135,9 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
         params: '{}',
         type: predictionModels.ARIMA,
         namespace: namespace,
+        signal_cid: params.source,
+        hist_cid: histCid,
+        futr_cid: futrCid,
     }
     const modelId = await createPrediction(context, prediction);
     let modelParams = await getParamsById(context, modelId);
@@ -138,6 +156,7 @@ async function createArimaModel(context, sigSetId, params) {
     });
 }
 
+module.exports.getById = getById;
 module.exports.create = createArimaModel;
 module.exports.createTx = createArimaModelTx;
 module.exports.listDTAjax = listDTAjax;

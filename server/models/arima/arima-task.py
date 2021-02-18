@@ -730,6 +730,13 @@ def main():
         if 'autoarima' in params: # TODO: Rework
             input_config['auto'] = params['autoarima']
 
+        if 'useAggregation' in params: # TODO: Remove after rework
+            input_config['aggregation'] = params['useAggregation']
+        else:
+            input_config['aggregation'] = False
+
+        print(params)
+
         if state is None:
             if input_config['aggregation']:
                 reader = ElasticAggReader(
@@ -738,8 +745,16 @@ def main():
                 reader = ElasticReader(
                     es, input_config['index_name'], input_config['ts_name'], input_config['value_name'])  # TODO: min_ts
             name = params['sigSet'] + dt.datetime.now().strftime(pythondateformat)
-            history_writer = PredWriter(ivis, ns, name + "_hist", "")
-            future_writer = PredWriter(ivis, ns, name + "_futr", "")
+
+            histCid = name + "_hist"
+            futrCid = name + "_futr"
+
+            if 'histCid' in params:
+                histCid = params['histCid']
+                futrCid = params['futrCid']
+
+            history_writer = PredWriter(ivis, ns, histCid, "")
+            future_writer = PredWriter(ivis, ns, futrCid, "")
     else:
         # Try loading saved model
         try:

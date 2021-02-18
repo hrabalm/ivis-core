@@ -53,6 +53,7 @@ import SignalSetAggregations from './settings/signal-sets/Aggregations';
 import AggregationsCUD from './settings/signal-sets/AggregationsCUD';
 import SignalSetPredictions from './settings/signal-sets/Predictions';
 import PredictionsArimaCUD from './settings/signal-sets/PredictionsArimaCUD';
+import PredictionsCompare from './settings/signal-sets/PredictionsCompare';
 import RecordsList from './settings/signal-sets/RecordsList';
 import RecordsCUD from './settings/signal-sets/RecordsCUD';
 
@@ -495,6 +496,11 @@ const getStructure = t => {
                                                 link: params => `/settings/signal-sets/${params.signalSetId}/predictions/create-arima`,
                                                 // visible: resolved => false && resolved, // isn't really shown anywhere
                                                 panelRender: props => <PredictionsArimaCUD signalSet={props.resolved.signalSet} action="create" />
+                                            },
+                                            'compare': {
+                                                title: t('Compare models'),
+                                                link: params => `/settings/signal-sets/${params.signalSetId}/predictions/compare`,
+                                                panelRender: props => <PredictionsCompare signalSet={props.resolved.signalSet} />
                                             },
                                         }
                                     },

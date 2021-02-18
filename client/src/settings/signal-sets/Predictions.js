@@ -49,7 +49,7 @@ export default class PredictionsList extends Component {
                 }
             },
             { data: 3, title: t('type(debug)'), render: data => `${data}` },
-            { data: 0, title: t('Predicted Signal'), render: data => `${data}` },
+            { data: 4, title: t('Predicted Signal'), render: data => `${data}` },
             {
                 actions: data => {
                     const actions = [];
@@ -65,6 +65,9 @@ export default class PredictionsList extends Component {
             <Panel title={t('Predictions')}>
                 {tableRestActionDialogRender(this)}
                 <Toolbar>
+                    <LinkButton to={`/settings/signal-sets/${sigSetId}/predictions/compare`} className="btn-primary"
+                        //icon="plus"
+                        label={t('Compare models')} />
                     <LinkButton to={`/settings/signal-sets/${sigSetId}/predictions/create-arima`} className="btn-primary"
                         icon="plus"
                         label={t('Add ARIMA model')} />
