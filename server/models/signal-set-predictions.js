@@ -7,7 +7,7 @@ const { getBuiltinTask } = require("./builtin-tasks");
 const jobs = require('./jobs');
 const log = require('../lib/log');
 //const { createTx } = require('./signals');
-const { enforce } = require('../lib/helpers');
+const { enforce, filterObject } = require('../lib/helpers');
 const shares = require('./shares');
 
 const predictionModels = {
@@ -15,29 +15,39 @@ const predictionModels = {
     // NAIVE: 'naive',
 };
 
+const allowedKeys = new Set(['name', 'type', 'params', 'namespace', 'sigSetId']);
+
+function generateHistoryIndexName(signalSetName, modelName, modelType) {
+    return [signalSetName, modelName, modelType, 'hist'].join('_');
+}
+
+function generateFutureIndexName(signalSetName, modelName, modelType) {
+    return [signalSetName, modelName, modelType, 'futr'].join('_');
+}
+
+function generateJobName(signalSetName, modelName, modelType, postfix = '') {
+    if (postfix == '')
+        return [signalSetName, modelName, modelType, postfix].join('_');
+    else
+        return [signalSetName, modelName, modelType].join('_');
+}
+
 async function listDTAjax(context, sigSetId, params) {
     return await dtHelpers.ajaxList(
         params,
         builder => builder
             .from('predictions')
             .where('sigSetId', sigSetId),
-        ['predictions.id', 'predictions.sigSetId', 'predictions.name', 'predictions.type'],//['sigSetId', 'name'],
+        ['predictions.id', 'predictions.sigSetId', 'predictions.name', 'predictions.type'],
     )
 }
 
-async function createPrediction(context, sigSetId, name, type, namespace) {
-    let params = JSON.stringify({
-    });
+async function createPrediction(context, prediction) {
     return await knex.transaction(async tx => {
-        await shares.enforceEntityPermissionTx(tx, context, 'signalSet', sigSetId, 'createPrediction');
-        const prediction = {
-            sigSetId: sigSetId,
-            name: name,
-            params: params,
-            type: type,
-            namespace: namespace,
-        }
-        const id = await tx('predictions').insert(prediction);
+        await shares.enforceEntityPermissionTx(tx, context, 'signalSet', prediction.sigSetId, 'createPrediction');
+
+        const filteredPrediction = filterObject(prediction, allowedKeys);
+        const id = await tx('predictions').insert(filteredPrediction);
 
         await shares.rebuildPermissionsTx(tx, {
             entityTypeId: 'prediction',
@@ -83,7 +93,8 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
 
     const jobParams = { ...params, ...jobParams_org };
 
-    const jobName = `predictions_arima_${signalSet.cid}_${params.name}`; // TODO (multiple models per signal set)
+    //const jobName = `predictions_arima_${signalSet.cid}_${params.name}`; // TODO (multiple models per signal set)
+    const jobName = generateJobName(signalSet.cid, params.name, predictionModels.ARIMA);
     const modelName = params.name;
     const namespace = signalSet.namespace;
 
@@ -103,7 +114,14 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
     const jobId = await jobs.create(context, job);
 
     // TODO: Register job-model pair
-    const modelId = await createPrediction(context, sigSetId, params.name, predictionModels.ARIMA, namespace);
+    const prediction = {
+        sigSetId: sigSetId,
+        name: params.name,
+        params: '{}',
+        type: predictionModels.ARIMA,
+        namespace: namespace,
+    }
+    const modelId = await createPrediction(context, prediction);
     let modelParams = await getParamsById(context, modelId);
     modelParams.jobId = jobId;
     await updateParamsById(context, modelId, modelParams);
@@ -114,12 +132,12 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
     return jobId;
 }
 
-async function create(context, sigSetId, params) {
+async function createArimaModel(context, sigSetId, params) {
     return await knex.transaction(async tx => {
         return await createArimaModelTx(tx, context, sigSetId, params);
     });
 }
 
-module.exports.create = create;
+module.exports.create = createArimaModel;
 module.exports.createTx = createArimaModelTx;
 module.exports.listDTAjax = listDTAjax;
