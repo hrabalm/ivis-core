@@ -211,10 +211,10 @@ export default class PredictionsCompare extends Component {
         ];
 
         const modelsColumns = [
-            { data: 0, title: t('Id') },
+            { data: 0, title: t('Model id') },
             { data: 2, title: t('Name') },
-            { data: 3, title: t('Description') },
-            { data: 4, title: t('Signal') },
+            { data: 3, title: t('Type') },
+            { data: 4, title: t('Predicted signal') },
             //{ data: 4, title: t('Type'), render: data => signalTypes[data] },
         ];
         return (
