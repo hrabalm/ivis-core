@@ -7,7 +7,6 @@ const taskCode = fs.readFileSync('models/arima/arima-task.py', 'utf-8');
 const taskParams = require('./arima-params.json');
 
 const arimaTask = {
-    id: 'arima',
     name: 'ARIMA',
     description: 'ARIMA task',
     type: TaskType.PYTHON,
