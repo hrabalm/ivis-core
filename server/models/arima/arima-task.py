@@ -84,6 +84,7 @@ def read_ts(es, index_name, ts_name, value_name, start_ts='', aggregation=False,
 
 
 def read_ts_directly(es, index_name, ts_name, value_name, start_ts=''):
+    import elasticsearch.helpers as eshelp
     query = {
         # 'size': 10000,
         'query': {'match_all': {}},
@@ -373,6 +374,7 @@ class ElasticReader:
         return new_state
 
     def __setstate__(self, data):
+        import ivis
         self.__dict__ = data
         self.es = ivis.elasticsearch
 
@@ -457,6 +459,7 @@ class PredWriter:
         self.signal_set_desc = signal_set_desc
         self.namespace = namespace
         self.state = None
+        self.entities = ivis.entities
 
         self._create_output_signal_set(ivis)
 
@@ -518,10 +521,10 @@ class PredWriter:
         if ci is None:
             ci = (None, None)
         doc = {
-            self.state[self.signal_set_name]['fields']['ci_max']: ci[1],
-            self.state[self.signal_set_name]['fields']['predicted_value']: pred,
-            self.state[self.signal_set_name]['fields']['ci_min']: ci[0],
-            self.state[self.signal_set_name]['fields']['ts']: ts,
+            self.entities['signals'][self.signal_set_name]['ci_max']['field']: ci[1],
+            self.entities['signals'][self.signal_set_name]['predicted_value']['field']: pred,
+            self.entities['signals'][self.signal_set_name]['ci_min']['field']: ci[0],
+            self.entities['signals'][self.signal_set_name]['ts']['field']: ts,
         }
 
         res = self.es.index(index=self.state[self.signal_set_name]['index'], doc_type='_doc', body=doc)
@@ -530,11 +533,13 @@ class PredWriter:
         new_state = self.__dict__.copy()
         if 'es' in new_state:
             del new_state['es']
+            del new_state['entities']
         return new_state
 
     def __setstate__(self, data):
         self.__dict__ = data
         self.es = ivis.elasticsearch
+        self.entities = ivis.entities
 
 
 class DummyPredWriter:
@@ -708,7 +713,7 @@ def main():
 
         es = ivis.elasticsearch
         state = ivis.state
-        params = ivis.parameters
+        params = ivis.params
         entities = ivis.entities
 
         sig_set = entities['signalSets'][params['sigSet']]
