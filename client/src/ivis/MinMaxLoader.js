@@ -7,7 +7,7 @@ import {withAsyncErrorHandler, withErrorHandling} from "../lib/error-handling";
 import PropTypes from "prop-types";
 import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
-import {TimeIntervalDifference} from "./common";
+import {timeIntervalDifference} from "./common";
 
 /**
  * This component fetches the minimum and maximum for given signal(s) and calls props.processData with the values.
@@ -49,7 +49,7 @@ export class MinMaxLoader extends Component {
 
         const considerTs = !!this.props.config.tsSigCid;
         if (considerTs)
-            propsDiff |= TimeIntervalDifference(this, prevProps);
+            propsDiff |= timeIntervalDifference(this, prevProps);
 
         if (propsDiff)
             this.reloadData();

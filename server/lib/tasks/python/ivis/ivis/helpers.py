@@ -14,7 +14,7 @@ class Ivis:
         self._data = json.loads(sys.stdin.readline())
         self._elasticsearch = Elasticsearch([{'host': self._data['es']['host'], 'port': int(self._data['es']['port'])}])
         self.state = self._data.get('state')
-        self.parameters = self._data['params']
+        self.params = self._data['params']
         self.entities = self._data['entities']
         self.owned = self._data['owned']
 
@@ -34,8 +34,7 @@ class Ivis:
     def _send_request_message(msg):
         os.write(3, (json.dumps(msg) + '\n').encode())
 
-    @staticmethod
-    def create_signals(signal_sets=None, signals=None):
+    def create_signals(self, signal_sets=None, signals=None):
         msg = {
             'type': 'create_signals',
         }
@@ -47,10 +46,26 @@ class Ivis:
             msg['signals'] = signals
 
         Ivis._send_request_message(msg)
-        return Ivis._get_response_message()
+        response = Ivis._get_response_message()
 
-    @staticmethod
-    def create_signal_set(cid, namespace, name=None, description=None, record_id_template=None, signals=None):
+        # Add newly created to owned
+        for sig_set_cid, set_props in response.items():
+            signals_created = set_props.pop('signals', {})
+            if signal_sets is not None:
+                # Function allows passing in either array of signal sets or one signal set
+                if (isinstance(signal_sets, list) and any(map(lambda s: s["cid"] == sig_set_cid, signal_sets))) or (
+                        not isinstance(signal_sets, list) and signal_sets["cid"] == sig_set_cid):
+                    self.owned.setdefault('signalSets', {}).setdefault(sig_set_cid, {})
+            self.entities['signalSets'].setdefault(sig_set_cid, set_props)
+            if signals_created:
+                self.owned.setdefault('signals', {}).setdefault(sig_set_cid, {})
+                for sigCid, sig_props in signals_created.items():
+                    self.owned['signals'][sig_set_cid].setdefault(sigCid, {})
+                    self.entities['signals'].setdefault(sig_set_cid, {}).setdefault(sigCid, sig_props)
+
+        return response
+
+    def create_signal_set(self, cid, namespace, name=None, description=None, record_id_template=None, signals=None):
 
         signal_set = {
             "cid": cid,
@@ -66,10 +81,10 @@ class Ivis:
         if signals is not None:
             signal_set['signals'] = signals
 
-        return Ivis.create_signals(signal_sets=signal_set)
+        return self.create_signals(signal_sets=signal_set)
 
-    @staticmethod
-    def create_signal(signal_set_cid, cid, namespace, type, name=None, description=None, indexed=None, settings=None,
+    def create_signal(self, signal_set_cid, cid, namespace, type, name=None, description=None, indexed=None,
+                      settings=None,
                       weight_list=None, weight_edit=None, **extra_keys):
 
         # built-in type is shadowed here because this way we are able to call create_signal(set_cid, **signal),
@@ -96,10 +111,9 @@ class Ivis:
 
         signal.update(extra_keys)
 
-        signals = {}
-        signals[signal_set_cid]: signal
+        signals = {signal_set_cid: signal}
 
-        return Ivis.create_signals(signals=signals)
+        return self.create_signals(signals=signals)
 
     @staticmethod
     def store_state(state):

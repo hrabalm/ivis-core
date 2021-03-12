@@ -17,7 +17,7 @@ import * as dateMath from "../lib/datemath";
 import {Icon} from "../lib/bootstrap-components";
 import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
-import {AreZoomTransformsEqual, ConfigDifference, setZoomTransform, transitionInterpolate, WheelDelta} from "./common";
+import {areZoomTransformsEqual, ConfigDifference, setZoomTransform, transitionInterpolate, wheelDelta} from "./common";
 import * as d3Zoom from "d3-zoom";
 import commonStyles from "./commons.scss";
 import timeBasedChartBaseStyles from "./TimeBasedChartBase.scss";
@@ -277,7 +277,7 @@ export class TimeBasedChartBase extends Component {
         } else if (this.delayedFetchDueToTimeIntervalChartWidthUpdate || prevAbs !== this.getIntervalAbsolute()) { // If its just a regular refresh, don't clear the chart
             this.delayedFetchDueToTimeIntervalChartWidthUpdate = false;
 
-            if (!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity)) // update time interval based on what is currently visible
+            if (!areZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity)) // update time interval based on what is currently visible
                 this.setInterval(...this.xScaleDomain);
 
             this.fetchData();
@@ -287,7 +287,7 @@ export class TimeBasedChartBase extends Component {
                 || prevState.signalSetsData !== this.state.signalSetsData
                 || configDiff !== ConfigDifference.NONE
                 || this.getIntervalAbsolute(prevProps) !== this.getIntervalAbsolute()
-                || !AreZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
+                || !areZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
 
             this.createChart(signalSetsData, forceRefresh);
             this.prevContainerNode = this.containerNode;
@@ -515,7 +515,7 @@ export class TimeBasedChartBase extends Component {
             .on("zoom", handleZoom)
             .on("end", handleZoomEnd)
             .on("start", handleZoomStart)
-            .wheelDelta(WheelDelta(3))
+            .wheelDelta(wheelDelta(3))
             .filter(() => {
                 if (d3Event.type === "wheel" && !d3Event.shiftKey)
                     return false;
@@ -593,7 +593,7 @@ export class TimeBasedChartBase extends Component {
                     </defs>
                     <g transform={`translate(${this.props.margin.left}, ${this.props.margin.top})`}
                        clipPath="url(#plotRect)" ref={node => this.GraphContentSelection = select(node)}>
-                        {(!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.loading) &&
+                        {(!areZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.loading) &&
                         <rect className={timeBasedChartBaseStyles.loadingOverlay}/>}
                         {this.props.getGraphContent(this)}
                     </g>

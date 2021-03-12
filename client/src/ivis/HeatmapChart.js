@@ -19,7 +19,7 @@ import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
 import {Tooltip} from "./Tooltip";
 import {Icon} from "../lib/bootstrap-components";
-import {AreZoomTransformsEqual, brushHandlesLeftRight, brushHandlesTopBottom, ConfigDifference, drawBars, getColorScale, setZoomTransform, TimeIntervalDifference, transitionInterpolate, WheelDelta, ZoomEventSources} from "./common";
+import {areZoomTransformsEqual, brushHandlesLeftRight, brushHandlesTopBottom, ConfigDifference, drawBars, getColorScale, setZoomTransform, timeIntervalDifference, transitionInterpolate, wheelDelta, ZoomEventSources} from "./common";
 import styles from "./CorrelationCharts.scss";
 import {PropType_d3Color} from "../lib/CustomPropTypes";
 import StatusMsg from "./StatusMsg";
@@ -230,7 +230,7 @@ export class HeatmapChart extends Component {
         // test if time interval changed
         const considerTs = !!this.props.config.tsSigCid;
         if (considerTs)
-            configDiff = Math.max(configDiff, TimeIntervalDifference(this, prevProps));
+            configDiff = Math.max(configDiff, timeIntervalDifference(this, prevProps));
 
         // test if limits changed
         if (!Object.is(prevProps.xMinValue, this.props.xMinValue) || !Object.is(prevProps.xMaxValue, this.props.xMaxValue) || !Object.is(prevProps.yMinValue, this.props.yMinValue) || !Object.is(prevProps.yMaxValue, this.props.yMaxValue)) {
@@ -258,7 +258,7 @@ export class HeatmapChart extends Component {
                 || prevState.signalSetData !== this.state.signalSetData
                 || configDiff !== ConfigDifference.NONE;
 
-            const updateZoom = !AreZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform)
+            const updateZoom = !areZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform)
                 || prevState.zoomYScaleMultiplier !== this.state.zoomYScaleMultiplier;
 
             this.createChart(forceRefresh, updateZoom);
@@ -323,7 +323,7 @@ export class HeatmapChart extends Component {
                     filter.children.push(this.props.filter);
 
                 // filter by current zoom
-                if (!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.zoomYScaleMultiplier !== 1) {
+                if (!areZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity) || this.state.zoomYScaleMultiplier !== 1) {
                     const scaleX = this.state.zoomTransform.k;
                     maxBucketCountX = Math.ceil(maxBucketCountX * scaleX);
                     const scaleY = this.state.zoomTransform.k * this.state.zoomYScaleMultiplier;
@@ -767,7 +767,7 @@ export class HeatmapChart extends Component {
                     self.ignoreZoomEvents = false;
                     self.deselectPoints();
                     setZoomTransform(self)(newTransform, newZoomYScaleMultiplier);
-                    if (self.zoom && !AreZoomTransformsEqual(newTransform, d3Zoom.zoomTransform(self.svgContainerSelection.node())))
+                    if (self.zoom && !areZoomTransformsEqual(newTransform, d3Zoom.zoomTransform(self.svgContainerSelection.node())))
                         self.zoom.transform(self.svgContainerSelection, newTransform);
                     self.moveBrush(newTransform, newZoomYScaleMultiplier);
                 }, 150, self.state.zoomYScaleMultiplier, newZoomYScaleMultiplier);
@@ -777,7 +777,7 @@ export class HeatmapChart extends Component {
                     self.lastZoomCausedByUser = true;
 
                 setZoomTransform(self)(newTransform, newZoomYScaleMultiplier);
-                if (self.zoom && !AreZoomTransformsEqual(newTransform, d3Zoom.zoomTransform(self.svgContainerSelection.node())))
+                if (self.zoom && !areZoomTransformsEqual(newTransform, d3Zoom.zoomTransform(self.svgContainerSelection.node())))
                     self.zoom.transform(self.svgContainerSelection, newTransform);
 
                 // noinspection JSUnresolvedVariable
@@ -821,7 +821,7 @@ export class HeatmapChart extends Component {
             .on("end", handleZoomEnd)
             .on("start", handleZoomStart)
             .interpolate(d3Interpolate.interpolate)
-            .wheelDelta(WheelDelta(2));
+            .wheelDelta(wheelDelta(2));
         this.svgContainerSelection.call(this.zoom);
         if (d3Zoom.zoomTransform(this.svgContainerSelection.node()).k < minZoom)
             this.svgContainerSelection.call(this.zoom.scaleTo, this.props.zoomLevelMin);

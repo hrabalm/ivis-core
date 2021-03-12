@@ -17,7 +17,7 @@ import {withTranslation} from "../lib/i18n";
 import {PropType_d3Color_Required, PropType_NumberInRange} from "../lib/CustomPropTypes";
 import {withPageHelpers} from "../lib/page-common";
 import {Tooltip} from "./Tooltip";
-import {AreZoomTransformsEqual, ConfigDifference, isInExtent, setZoomTransform, TimeIntervalDifference, transitionInterpolate, WheelDelta, ZoomEventSources} from "./common";
+import {areZoomTransformsEqual, ConfigDifference, isInExtent, setZoomTransform, timeIntervalDifference, transitionInterpolate, wheelDelta, ZoomEventSources} from "./common";
 import {Icon} from "../lib/bootstrap-components";
 import * as d3Format from "d3-format";
 import * as d3Zoom from "d3-zoom";
@@ -211,7 +211,7 @@ export class ViolinPlot extends Component {
         // test if time interval changed
         const considerTs =  this.props.config.signalSets.some(setConf => !!setConf.tsSigCid);
         if (considerTs)
-            configDiff = Math.max(configDiff, TimeIntervalDifference(this, prevProps));
+            configDiff = Math.max(configDiff, timeIntervalDifference(this, prevProps));
 
         // test if limits changed
         if (!Object.is(prevProps.yMinValue, this.props.yMinValue) || !Object.is(prevProps.yMaxValue, this.props.yMaxValue))
@@ -240,7 +240,7 @@ export class ViolinPlot extends Component {
                 || configDiff !== ConfigDifference.NONE
                 || prevProps.height !== this.props.height;
 
-             const updateZoom = !AreZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
+             const updateZoom = !areZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
 
              this.createChart(forceRefresh, updateZoom);
              this.prevContainerNode = this.containerNode;
@@ -367,7 +367,7 @@ export class ViolinPlot extends Component {
         }
 
         let maxBucketCount = this.props.maxBucketCount || this.state.maxBucketCount;
-        if (!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity)) // allow more buckets if zoomed in
+        if (!areZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity)) // allow more buckets if zoomed in
             maxBucketCount = Math.ceil(maxBucketCount * this.state.zoomTransform.k);
         let minStep = this.props.minStep;
         if (maxBucketCount > 0) {
@@ -815,7 +815,7 @@ export class ViolinPlot extends Component {
             .on("zoom", handleZoom)
             .on("end", handleZoomEnd)
             .on("start", handleZoomStart)
-            .wheelDelta(WheelDelta(2))
+            .wheelDelta(wheelDelta(2))
             .filter(() => {
                 if (d3Event.type === "wheel" && !d3Event.shiftKey)
                     return false;

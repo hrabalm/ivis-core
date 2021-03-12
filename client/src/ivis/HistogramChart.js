@@ -19,7 +19,7 @@ import {withTranslation} from "../lib/i18n";
 import {Tooltip} from "./Tooltip";
 import {Icon} from "../lib/bootstrap-components";
 import styles from "./CorrelationCharts.scss";
-import {brushHandlesLeftRight, ConfigDifference, isInExtent, transitionInterpolate, WheelDelta, ZoomEventSources, AreZoomTransformsEqual, TimeIntervalDifference} from "./common";
+import {brushHandlesLeftRight, ConfigDifference, isInExtent, transitionInterpolate, wheelDelta, ZoomEventSources, areZoomTransformsEqual, timeIntervalDifference} from "./common";
 import {PropType_d3Color_Required, PropType_NumberInRange} from "../lib/CustomPropTypes";
 import StatusMsg from "./StatusMsg";
 import commonStyles from "./commons.scss";
@@ -180,7 +180,7 @@ export class HistogramChart extends Component {
         // test if time interval changed
         const considerTs = !!this.props.config.tsSigCid;
         if (considerTs)
-            configDiff = Math.max(configDiff, TimeIntervalDifference(this, prevProps));
+            configDiff = Math.max(configDiff, timeIntervalDifference(this, prevProps));
 
         // test if limits changed
         if (!Object.is(prevProps.xMinValue, this.props.xMinValue) || !Object.is(prevProps.xMaxValue, this.props.xMaxValue))
@@ -208,7 +208,7 @@ export class HistogramChart extends Component {
                 || prevState.signalSetData !== this.state.signalSetData
                 || configDiff !== ConfigDifference.NONE;
 
-            const updateZoom = !AreZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
+            const updateZoom = !areZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
 
             this.createChart(forceRefresh, updateZoom);
             this.prevContainerNode = this.containerNode;
@@ -260,7 +260,7 @@ export class HistogramChart extends Component {
                     filter.children.push(this.props.filter);
 
                 // filter by current zoom
-                if (!AreZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity)) {
+                if (!areZoomTransformsEqual(this.state.zoomTransform, d3Zoom.zoomIdentity)) {
                     const scale = this.state.zoomTransform.k;
                     maxBucketCount = Math.ceil(maxBucketCount * scale);
                     isZoomedIn = true;
@@ -632,7 +632,7 @@ export class HistogramChart extends Component {
             .on("zoom", handleZoom)
             .on("end", handleZoomEnd)
             .on("start", handleZoomStart)
-            .wheelDelta(WheelDelta(2))
+            .wheelDelta(wheelDelta(2))
             .filter(() => {
                 if (d3Event.type === "wheel" && !d3Event.shiftKey)
                     return false;

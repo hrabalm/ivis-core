@@ -4,10 +4,6 @@ const TaskType = {
     PYTHON: 'python',
 };
 
-if (Object.freeze) {
-    Object.freeze(TaskType)
-}
-
 const defaultSubtypeKey = '__default__';
 
 const PythonSubtypes = {
@@ -15,10 +11,6 @@ const PythonSubtypes = {
     NUMPY: 'numpy',
     ARIMA: 'arima'
 };
-
-if (Object.freeze) {
-    Object.freeze(PythonSubtypes)
-}
 
 const subtypesByType = {
     [TaskType.PYTHON]: PythonSubtypes
@@ -33,18 +25,10 @@ const BuildState = {
     INITIALIZING: 5
 };
 
-if (Object.freeze) {
-    Object.freeze(BuildState)
-}
-
 const TaskSource = {
     USER: 'user',
     BUILTIN: 'builtin'
 };
-
-if (Object.freeze) {
-    Object.freeze(BuildState)
-}
 
 function getFinalStates() {
     return [BuildState.FINISHED, BuildState.FAILED, BuildState.UNINITIALIZED];

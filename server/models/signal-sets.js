@@ -28,9 +28,8 @@ const signalSetAggregations = require('./signal-set-aggregations');
 
 const dependencyHelpers = require('../lib/dependency-helpers');
 
-const allowedKeysCreate = new Set(['cid', 'type', 'name', 'description', 'namespace', 'record_id_template', 'settings', 'kind']);
-const allowedKeysUpdate = new Set(['name', 'description', 'namespace', 'record_id_template', 'settings', 'kind']);
 
+const {allowedKeysUpdate, allowedKeysCreate} = require('../lib/signal-set-helpers');
 const handlebars = require('handlebars');
 
 

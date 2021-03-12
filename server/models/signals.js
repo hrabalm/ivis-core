@@ -15,8 +15,7 @@ const shares = require('./shares');
 const {SignalSetType} = require('../../shared/signal-sets');
 const entitySettings = require('../lib/entity-settings');
 
-const allowedKeysCreate = new Set(['cid', 'name', 'description', 'type', 'source', 'indexed', 'settings', 'set', 'namespace', 'weight_list', 'weight_edit', ...em.get('models.signals.extraKeys', [])]);
-const allowedKeysUpdate = new Set(['cid', 'name', 'description', 'type', 'source', 'indexed', 'settings', 'namespace', 'weight_list', 'weight_edit', ...em.get('models.signals.extraKeys', [])]);
+const {allowedKeysUpdate, allowedKeysCreate} = require('../lib/signal-helpers');
 
 function hash(entity) {
     return hasher.hash(filterObject(entity, allowedKeysUpdate));

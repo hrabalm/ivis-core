@@ -4,23 +4,20 @@ const config = require('../lib/config');
 const knex = require('../lib/knex');
 const em = require('../lib/extension-manager');
 
-const {JobState, RunStatus, HandlerMsgType, JobMsgType} = require('../../shared/jobs');
+const {JobState, RunStatus, HandlerMsgType} = require('../../shared/jobs');
 const {TaskType, BuildState, isTransitionState} = require('../../shared/tasks');
-const {SignalSetType} = require('../../shared/signal-sets');
-const {SignalSource} = require('../../shared/signals');
 const log = require('../lib/log');
-const {getFieldName, getIndexName} = require('../lib/indexers/elasticsearch-common');
 const moment = require('moment');
 const getTaskBuildOutputDir = require('../lib/task-handler').getTaskBuildOutputDir;
-const {getAdminContext} = require('../lib/context-helpers');
-const createSigSet = require('../models/signal-sets').createTx;
-const createSignal = require('../models/signals').createTx;
 const {resolveAbs, getFieldsetPrefix} = require('../../shared/param-types-helpers');
+const {getSignalEntitySpec} = require('../lib/signal-helpers')
+const {getSignalSetEntitySpec} = require('../lib/signal-set-helpers')
+const {createRunManager} = require('./jobs/run-manager');
 
 const es = require('../lib/elasticsearch');
 const {TYPE_JOBS, INDEX_JOBS, STATE_FIELD} = require('../lib/task-handler').esConstants
 
-const {getSuccessEventType, getFailEventType, getOutputEventType, getStopEventType} = require('../lib/task-events');
+const {getFailEventType, getStopEventType} = require('../lib/task-events');
 
 const LOG_ID = 'Task-handler';
 
@@ -57,7 +54,7 @@ class HandlerNotFoundError extends Error {
 /* Message processing */
 process.on('message', handleMsg);
 
-function emit(eventType, data) {
+function emitToCoreSystem(eventType, data) {
     process.send({
         type: eventType,
         data: data
@@ -144,7 +141,7 @@ async function stop(msg) {
         }
     }
 
-    emit(getStopEventType(runId))
+    emitToCoreSystem(getStopEventType(runId))
 }
 
 /**
@@ -171,7 +168,6 @@ async function afterDelay(msg, task, job) {
     delayedMap.delete(job.id);
     await processRunMsg(msg, task, job);
 }
-
 
 /**
  * Prepare entities specifications for a job, like index name in es.
@@ -214,34 +210,20 @@ async function getEntitiesFromParams(job, jobParams, taskParams) {
     }
 
     async function addAllSignalsOfSignalSet(signalSet) {
-
-        if (!entities.signals[signalSet.cid]) {
-            entities.signals[signalSet.cid] = {};
-        }
+        const specSignals = entities.signals[signalSet.cid] || {};
 
         const signals = await knex('signals').where({set: signalSet.id});
         for (const signal of signals) {
-            if (entities.signals[signalSet.cid][signal.cid]) {
+            if (specSignals[signal.cid]) {
                 // info already stored
                 continue;
             }
-            entities.signals[signalSet.cid][signal.cid] = getSignalEntitySpec(signal);
+            specSignals[signal.cid] = getSignalEntitySpec(signal);
         }
+
+        entities.signals[signalSet.cid] = specSignals;
     }
 
-    function getSignalEntitySpec(signal) {
-        return {
-            ...signal,
-            field: getFieldName(signal.id),
-        };
-    }
-
-    function getSignalSetEntitySpec(signalSet) {
-        return {
-            ...signalSet,
-            index: getIndexName(signalSet),
-        };
-    }
 
     // Walks all subtrees of params and gets info for signals and signalSets found
     async function loadFromParams(prefix, jobParamsSpec, taskParamsSpec) {
@@ -384,7 +366,7 @@ async function getSignalSetsOwnedByJob(jobId) {
  */
 async function checkAndSetMsgRunStatus(runId, status, output) {
     if (runId) {
-        await updateRun(runId, {
+        await knex('job_runs').where('id', runId).update({
             status: status,
             output: output
         });
@@ -422,9 +404,9 @@ async function processRunMsg(msg, task, job) {
     spec.taskType = task.type;
 
     if (!spec.runId) {
-        msg.spec.runId = await createRun(job.id, RunStatus.SCHEDULED);
+        spec.runId = await createRun(job.id, RunStatus.SCHEDULED);
     } else {
-        await updateRun(spec.runId, {status: RunStatus.SCHEDULED});
+        await knex('job_runs').where('id', spec.runId).update({status: RunStatus.SCHEDULED});
     }
 
     const lastRun = await knex('job_runs').where({
@@ -583,20 +565,6 @@ async function createRun(jobId, status) {
         started_at: new Date()
     });
     return runId[0];
-}
-
-/**
- *  Update run
- * @param runId
- * @param columns
- * @returns {Promise<void>}
- */
-async function updateRun(runId, columns) {
-    try {
-        await knex('job_runs').where('id', runId).update(columns);
-    } catch (err) {
-        log.error(`Run ${runId} couldn't be updated.`, err);
-    }
 }
 
 /**
@@ -782,7 +750,7 @@ async function onRunFail(jobId, runId, runData, errMsg) {
     inProcessMsgs.delete(runId);
 
     await handleRunFail(jobId, runId, runData, errMsg);
-    emit(getFailEventType(runId), errMsg);
+    emitToCoreSystem(getFailEventType(runId), errMsg);
 }
 
 async function handleRunFail(jobId, runId, runData, errMsg) {
@@ -797,7 +765,7 @@ async function handleRunFail(jobId, runId, runData, errMsg) {
         try {
             const run = await knex('job_runs').select('output').where('id', runId).first();
             runData.output = [errMsg, `Log:\n${run.output}`].join('\n\n');
-            await updateRun(runId, runData);
+            await knex('job_runs').where('id', runId).update(runData);
         } catch (err) {
             log.error(LOG_ID, err);
         }
@@ -809,72 +777,6 @@ async function handleRunFail(jobId, runId, runData, errMsg) {
 }
 
 
-function parseRequest(req) {
-    return JSON.parse(req);
-}
-
-
-async function handleRequest(jobId, requestStr) {
-    let response = {};
-
-    if (!requestStr) {
-        response.error = "Request not specified";
-        return response;
-    }
-
-    let request = {};
-    try {
-        request = parseRequest(requestStr);
-
-        if (request.id) {
-            response.id = request.id;
-        }
-
-    } catch (err) {
-        response.error = `Request parsing failed: ${err.message}`;
-        return response;
-    }
-
-    if (!request.type) {
-        response.error = "Type not specified";
-        return response;
-    }
-
-    try {
-        switch (request.type) {
-            case JobMsgType.CREATE_SIGNALS:
-                if (request.signalSets || request.signals) {
-                    const reqResult = await processCreateRequest(jobId, request.signalSets, request.signals);
-                    response = {
-                        ...response,
-                        ...reqResult
-                    };
-                } else {
-                    response.error = `Either signalSets or signals have to be specified`;
-                }
-                break;
-            case  JobMsgType.STORE_STATE:
-                if (request[STATE_FIELD]) {
-                    const reqResult = await storeRunState(jobId, request[STATE_FIELD]);
-                    response = {
-                        ...response,
-                        ...reqResult
-                    };
-                } else {
-                    response.error(`${STATE_FIELD} not specified`)
-                }
-                break;
-            default:
-                response.error = `Type ${request.type} not recognized`;
-                break;
-        }
-    } catch (error) {
-        log.warn(LOG_ID, error);
-        response.error = error.message;
-    }
-    return response;
-}
-
 /**
  * @typedef {Object} IndexInfo
  * @property {string} index - Created index name.
@@ -883,104 +785,6 @@ async function handleRequest(jobId, requestStr) {
 
 // TODO - we would need something similar for signals
 
-/**
- * Process request for signal set and signals creation
- * Signals are specified in sigSet.signals
- * Uses same data format as web creation
- * @param jobId
- * @param signalSets
- * @param signalsSpec
- * @returns {Promise<IndexInfo>} Created indices and mapping
- */
-async function processCreateRequest(jobId, signalSets, signalsSpec) {
-    const esInfo = {};
-
-    async function createSignalSetWithSignals(tx, signalSet) {
-
-        const esSetInfo = {};
-
-        let signals = signalSet.signals;
-        delete signalSet.signals;
-
-        signalSet.type = SignalSetType.COMPUTED;
-
-        signalSet.id = await createSigSet(tx, getAdminContext(), signalSet);
-        esSetInfo.index = getIndexName(signalSet);
-        esSetInfo.type = TYPE_JOBS;
-
-        esSetInfo.fields = {};
-        if (signals) {
-            if (!Array.isArray(signals)) {
-                signals = [signals];
-            }
-
-            for (const signal of signals) {
-                // Here are possible overwrites of input from job
-                signal.weight_list = 0;
-                signal.weight_edit = null;
-                signal.source = SignalSource.JOB;
-                const sigId = await createSignal(tx, getAdminContext(), signalSet.id, signal);
-                esSetInfo['fields'][signal.cid] = getFieldName(sigId);
-            }
-        }
-
-        await tx('signal_sets_owners').insert({job: jobId, set: signalSet.id});
-        return esSetInfo;
-    }
-
-    async function createComputedSignal(tx, signalSetId, signal) {
-        // Here are possible overwrites of input form job
-        signal.weight_list = 0;
-        signal.weight_edit = null;
-        signal.source = SignalSource.JOB;
-        const sigId = await createSignal(tx, getAdminContext(), signalSetId, signal);
-
-        // TODO should add something like signal_sets_owners for signals probably
-        return getFieldName(sigId);
-    }
-
-    try {
-        await knex.transaction(async (tx) => {
-            if (signalSets) {
-                if (Array.isArray(signalSets)) {
-                    for (let signalSet of signalSets) {
-                        esInfo[signalSet.cid] = await createSignalSetWithSignals(tx, signalSet);
-                    }
-                } else {
-                    esInfo[signalSets.cid] = await createSignalSetWithSignals(tx, signalSets);
-                }
-            }
-
-            if (signalsSpec) {
-                for (let [sigSetCid, signals] of Object.entries(signalsSpec)) {
-                    const sigSet = await tx('signal_sets').where('cid', sigSetCid).first();
-                    if (!sigSet) {
-                        throw new Error(`Signal set with cid ${sigSetCid} not found`);
-                    }
-
-                    esInfo[sigSetCid] = {};
-                    esInfo[sigSetCid]['index'] = getIndexName(sigSet);
-                    esInfo[sigSetCid]['type'] = TYPE_JOBS;
-                    esInfo[sigSetCid]['fields'] = {};
-
-                    if (!Array.isArray(signals)) {
-                        signals = [signals];
-                    }
-
-                    for (let signal of signals) {
-                        esInfo[sigSetCid]['fields'][signal.cid] = await createComputedSignal(tx, sigSet.id, signal);
-                    }
-
-                }
-            }
-        });
-    } catch (error) {
-        log.warn(LOG_ID, error);
-        esInfo.error = error.message;
-    }
-
-    return esInfo;
-}
 
 /**
  * Load saved config from elasticsearch
@@ -1004,129 +808,6 @@ async function loadJobState(id) {
     }
 }
 
-/**
- * Store config from job, overwrites old config
- * @param id ID of the job config belongs to
- * @param state Config to store, JSON format
- * @returns {Promise<void>}
- */
-async function storeRunState(id, state) {
-    const jobBody = {};
-    jobBody[STATE_FIELD] = state;
-    try {
-        await es.index({index: INDEX_JOBS, type: TYPE_JOBS, id: id, body: jobBody});
-    } catch (err) {
-        return {error: err.message};
-    }
-}
-
-function createRunHandler(jobId, runId) {
-    const runData = {};
-    runData.started_at = new Date();
-
-    const maxOutput = config.tasks.maxRunOutputBytes || 1000000;
-    let outputBytes = 0;
-    let limitReached = false;
-    let outputBuffer = [];
-    let timer;
-
-    return {
-        onRunEvent,
-        onRunSuccess,
-        onRunFail: onRunFailFromRunningStatus
-    }
-
-    async function onRunFailFromRunningStatus(errMsg) {
-        await cleanBuffer();
-        await onRunFail(jobId, runId, runData, errMsg);
-    }
-
-    /**
-     * Callback for successful run.
-     * @param config
-     * @returns {Promise<void>}
-     */
-    async function onRunSuccess(config) {
-        await cleanBuffer();
-
-        inProcessMsgs.delete(runId);
-        jobRunning.delete(jobId);
-        runData.finished_at = new Date();
-        runData.status = RunStatus.SUCCESS;
-        try {
-            await updateRun(runId, runData);
-            if (config) {
-                await storeRunState(config);
-            }
-        } catch (err) {
-            log.error(LOG_ID, err);
-        }
-        emit(getSuccessEventType(runId));
-    }
-
-    async function cleanBuffer() {
-        try {
-            if (outputBuffer.length > 0) {
-                let output = [...outputBuffer];
-                outputBuffer = [];
-                emit(getOutputEventType(runId), output);
-                await knex('job_runs').update({output: knex.raw('CONCAT(COALESCE(`output`,\'\'), ?)', output.join(''))}).where('id', runId);
-            }
-            timer = null;
-        } catch (e) {
-            log.error(LOG_ID, `Output handling for the run ${runId} failed`, e);
-            outputBuffer = [];
-            timer = null;
-        }
-    }
-
-    async function onRunEvent(type, data) {
-        switch (type) {
-            case 'output':
-                try {
-                    if (!limitReached) {
-                        let byteLength = Buffer.byteLength(data, 'utf8');
-                        outputBytes += byteLength
-                        if (outputBytes >= maxOutput) {
-                            limitReached = true;
-                            if (config.tasks.printLimitReachedMessage === true) {
-                                try {
-                                    await knex('job_runs').update({output: knex.raw('CONCAT(`output`, \'INFO: max output storage capacity reached\')')}).where('id', runId);
-
-                                    const maxMsg = 'INFO: max output capacity reached'
-                                    if (!timer) {
-                                        emit(getOutputEventType(runId), maxMsg);
-                                    } else {
-                                        outputBuffer.push(maxMsg);
-                                    }
-                                } catch (e) {
-                                    log.error(LOG_ID, `Output handling for the run ${runId} failed`, e);
-                                }
-                            }
-                        } else {
-                            outputBuffer.push(data);
-                            // TODO Don't know how well this will scale
-                            // --   it might be better to append to a file, but this will require further syncing
-                            // --   as we need full output for task development in the UI, not only output after the register of listener
-                            // --   therefore keeping it this way for now
-                            if (!timer) {
-                                timer = setTimeout(cleanBuffer, 1000);
-                            }
-                        }
-                    }
-
-                } catch (e) {
-                    log.error(LOG_ID, `Output handling for the run ${runId} failed`, e);
-                }
-                break;
-            case 'request':
-                return await handleRequest(jobId, data);
-            default:
-                log.info(LOG_ID, `Job ${jobId} run ${runId}: unknown event ${type} `);
-                break;
-        }
-    }
-}
 
 /**
  * Handle run task.
@@ -1143,7 +824,7 @@ async function handleRun(workEntry) {
             throw new HandlerNotFoundError('Handler for type not found', spec.id);
         }
 
-        await updateRun(runId, {status: RunStatus.RUNNING});
+        await knex('job_runs').where('id', runId).update({status: RunStatus.RUNNING});
         inProcessMsgs.set(runId, handler);
 
         const runConfig = {
@@ -1158,18 +839,27 @@ async function handleRun(workEntry) {
             }
         };
 
-        const runHandler = createRunHandler(jobId, runId);
+        // TODO move interaction, as running and stopping, to run manager
+        // there is a lot of overhead for running a job so it will serve as intermediate layer for handlers
+        const runManager = createRunManager(jobId, runId, {
+            onRunFail,
+            onRunSuccess: ()=> {
+                inProcessMsgs.delete(runId);
+                jobRunning.delete(jobId);
+            },
+            emit: emitToCoreSystem
+        });
 
         handler.run(
             runConfig,
-            runHandler.onRunEvent,
-            runHandler.onRunSuccess,
-            runHandler.onRunFail
+            runManager.onRunEvent,
+            runManager.onRunSuccess,
+            runManager.onRunFail
         );
 
     } catch (err) {
         log.error(LOG_ID, err);
-        await updateRun(spec.runId, {status: RunStatus.FAILED});
+        await knex('job_runs').where('id', spec.runId).update({status: RunStatus.FAILED});
     }
 
 }

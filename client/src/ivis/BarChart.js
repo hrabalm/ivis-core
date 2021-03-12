@@ -14,7 +14,7 @@ import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
 import {PropType_d3Color, PropType_d3Color_Required, PropType_NumberInRange} from "../lib/CustomPropTypes";
 import {Tooltip} from "./Tooltip";
-import {AreZoomTransformsEqual, extentWithMargin, transitionInterpolate, WheelDelta} from "./common";
+import {areZoomTransformsEqual, extentWithMargin, transitionInterpolate, wheelDelta} from "./common";
 import styles from "./CorrelationCharts.scss";
 
 class TooltipContent extends Component {
@@ -44,7 +44,7 @@ class TooltipContent extends Component {
     withErrorHandling,
 ])
 export class StaticBarChart extends Component {
-    constructor(props){
+    constructor(props) {
         super(props);
 
         const t = props.t;
@@ -74,6 +74,8 @@ export class StaticBarChart extends Component {
         margin: PropTypes.object,
         padding: PropType_NumberInRange(0, 1),
         colors: PropTypes.arrayOf(PropType_d3Color_Required()),
+        /** is called when label is longer than bar width; return label to be used */
+        labelFormatOnBarWidthOverflow: PropTypes.func,
 
         minValue: PropTypes.number,
         maxValue: PropTypes.number,
@@ -90,10 +92,11 @@ export class StaticBarChart extends Component {
     };
 
     static defaultProps = {
-        margin: { left: 40, right: 5, top: 5, bottom: 20 },
+        margin: {left: 40, right: 5, top: 5, bottom: 20},
         padding: 0.2,
         minValue: 0,
         colors: d3Scheme.schemeCategory10,
+        labelFormatOnBarWidthOverflow: (t) => '...',
 
         withTooltip: true,
         withTransition: true,
@@ -113,7 +116,7 @@ export class StaticBarChart extends Component {
         const forceRefresh = this.prevContainerNode !== this.containerNode
             || !Object.is(prevProps.config, this.props.config);
 
-        const updateZoom = !AreZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
+        const updateZoom = !areZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
 
         this.createChart(forceRefresh, updateZoom);
         this.prevContainerNode = this.containerNode;
@@ -130,7 +133,7 @@ export class StaticBarChart extends Component {
         const width = this.containerNode.getClientRects()[0].width;
 
         if (this.state.width !== width)
-            this.setState({ width });
+            this.setState({width});
 
         const widthChanged = width !== this.renderedWidth;
         if (!forceRefresh && !widthChanged && !updateZoom) {
@@ -140,7 +143,8 @@ export class StaticBarChart extends Component {
 
         if (this.props.config.bars.length === 0) {
             this.statusMsgSelection.text(this.props.t('No data.'));
-
+            this.barsSelection.selectAll('rect').remove();
+            this.xAxisSelection.selectAll('.tick').remove();
             this.zoom = null;
             return;
         } else {
@@ -159,6 +163,15 @@ export class StaticBarChart extends Component {
             //.tickFormat(this.props.getLabel)
             .tickSizeOuter(0);
         this.xAxisSelection.call(xAxis);
+
+
+        // Checking overflowing labels
+        const texts = this.xAxisSelection.selectAll('.tick text');
+        texts.nodes().forEach((e, i) => {
+            if (e.getBBox().width > xScale.bandwidth()) {
+                e.textContent = this.props.labelFormatOnBarWidthOverflow(e.textContent, i);
+            }
+        });
 
         // y axis
         const ySize = this.props.height - this.props.margin.top - this.props.margin.bottom;
@@ -227,7 +240,7 @@ export class StaticBarChart extends Component {
             .on("zoom", handleZoom)
             .on("end", handleZoomEnd)
             .on("start", handleZoomStart)
-            .wheelDelta(WheelDelta(2))
+            .wheelDelta(wheelDelta(2))
             .filter(() => {
                 if (d3Event.type === "wheel" && !d3Event.shiftKey)
                     return false;
@@ -248,8 +261,9 @@ export class StaticBarChart extends Component {
             .data(data, d => d.label);
         const ySize = yScale.range()[0];
         const barWidth = xScale.bandwidth();
+        console.log(xScale.range())
 
-        const selectBar = function(bar = null) {
+        const selectBar = function (bar = null) {
             if (bar !== self.state.selection) {
                 self.highlightSelection
                     .selectAll('rect')
@@ -288,7 +302,7 @@ export class StaticBarChart extends Component {
             .on("mouseover", selectBar)
             .on("mousemove", selectBar)
             .on("mouseout", ::this.deselectBars);
-        (this.props.withTransition ?  allBars.transition() : allBars)
+        (this.props.withTransition ? allBars.transition() : allBars)
             .attr('y', d => yScale(d.value))
             .attr("height", d => ySize - yScale(d.value));
 
@@ -315,15 +329,17 @@ export class StaticBarChart extends Component {
         return (
             <div ref={node => this.svgContainerSelection = select(node)}
                  className={this.props.className ? `${styles.touchActionNone} ${this.props.className}` : styles.touchActionNone}
-                 style={this.props.style} >
+                 style={this.props.style}>
                 <svg id="cnt" ref={node => this.containerNode = node} height={this.props.height} width={"100%"}>
                     <defs>
                         <clipPath id="plotRect">
-                            <rect x="0" y="0" width={this.state.width - this.props.margin.left - this.props.margin.right}
+                            <rect x="0" y="0"
+                                  width={this.state.width - this.props.margin.left - this.props.margin.right}
                                   height={this.props.height - this.props.margin.top - this.props.margin.bottom}/>
                         </clipPath>
                         <clipPath id="bottomAxis">
-                            <rect x={-6} y={0} width={this.state.width - this.props.margin.left - this.props.margin.right + 6}
+                            <rect x={-6} y={0}
+                                  width={this.state.width - this.props.margin.left - this.props.margin.right + 6}
                                   height={this.props.margin.bottom} /* same reason for 6 as in HeatmapChart */ />
                         </clipPath>
                     </defs>

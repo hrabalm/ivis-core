@@ -49,15 +49,21 @@ export class Tooltip extends Component {
         }
     }
 
+    choosePosition() {
+        const xDists = [10, -60, 60 - this.props.width, -10 - this.props.width];
+        const xDist = xDists.find(d => this.props.mousePosition.x + d + this.props.width <= this.props.containerWidth) || xDists.length - 1;
+        const x = this.props.mousePosition.x + xDist;
+
+        const yDists = [10, -10 - this.state.height];
+        const yDist = yDists.find(d => this.props.mousePosition.y + d + this.state.height <= this.props.containerHeight - 15) || yDists.length - 1;
+        const y = this.props.mousePosition.y + yDist;
+
+        return [x, y];
+    }
+
     render() {
         if (this.props.containerWidth && this.props.containerHeight && this.props.selection) {
-            const xDists = [ 10, -60, 60 - this.props.width, -10 - this.props.width];
-            const xDist = xDists.find(d => this.props.mousePosition.x + d + this.props.width <= this.props.containerWidth) || xDists.length - 1;
-            const x = this.props.mousePosition.x + xDist;
-
-            const yDists = [ 10, -10 - this.state.height];
-            const yDist = yDists.find(d => this.props.mousePosition.y + d + this.state.height <= this.props.containerHeight - 15) || yDists.length - 1;
-            const y = this.props.mousePosition.y + yDist;
+            const [x, y] = this.choosePosition();
 
             let content;
             const contentProps = {
@@ -74,7 +80,8 @@ export class Tooltip extends Component {
 
             return (
                 <g transform={`translate(${x}, ${y})`}>
-                    <foreignObject requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" width={this.props.width} height={this.state.height}>
+                    <foreignObject requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"
+                                   width={this.props.width} height={this.state.height}>
                         <div ref={node => this.tooltipNode = node} className={styles.tooltip}>
                             {content}
                         </div>

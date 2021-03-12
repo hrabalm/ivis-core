@@ -7,6 +7,9 @@ import * as d3Selection from "d3-selection";
 import * as d3Interpolate from "d3-interpolate";
 import * as d3Zoom from "d3-zoom";
 
+export const ZoomEventSources = ["mousemove", "dblclick", "wheel", "touchstart", "touchmove" ]; // source: https://github.com/d3/d3-zoom#api-reference (table with events - causing "zoom" event)
+export {curveVerticalStep} from "../lib/d3-shape_step_vertical";
+
 /**
  * Adds margin to extent in format of d3.extent()
  */
@@ -62,7 +65,7 @@ export function getColorScale(domain, colors) {
         .range(colors);
 }
 
-export function ModifyColorCopy(color, new_opacity) {
+export function modifyColorCopy(color, new_opacity) {
     color = d3Color.color(color);
     // noinspection JSIncompatibleTypesComparison
     if (color === null)
@@ -109,7 +112,7 @@ export function brushHandlesTopBottom(group, selection, xSize) {
 }
 
 /** https://github.com/d3/d3-zoom#zoom_wheelDelta with multiplied values */
-export function WheelDelta(multiplier = 2) {
+export function wheelDelta(multiplier = 2) {
     return () => -d3Selection.event.deltaY * multiplier * (d3Selection.event.deltaMode === 1 ? 0.05 : d3Selection.event.deltaMode ? 1 : 0.002);
 }
 
@@ -140,9 +143,8 @@ export function setZoomTransform(self, setStateCallback) {
     }
 }
 
-export const ZoomEventSources = ["mousemove", "dblclick", "wheel", "touchstart", "touchmove" ]; // source: https://github.com/d3/d3-zoom#api-reference (table with events - causing "zoom" event)
 
-export function AreZoomTransformsEqual(a, b, scale_epsilon = 0.001, translate_epsilon = 0.01) {
+export function areZoomTransformsEqual(a, b, scale_epsilon = 0.001, translate_epsilon = 0.01) {
     if (!(a.hasOwnProperty("x") && a.hasOwnProperty("y") && a.hasOwnProperty("k"))) return false;
     if (!(b.hasOwnProperty("x") && b.hasOwnProperty("y") && b.hasOwnProperty("k"))) return false;
     if (Math.abs(a.k - b.k) > scale_epsilon) return false;
@@ -180,7 +182,6 @@ export function drawBars(data, selection, x_position, y_position, width, height,
         .remove();
 }
 
-export {curveVerticalStep} from "../lib/d3-shape_step_vertical";
 
 export const ConfigDifference = {
     // We assume here order from the most benign to the worst
@@ -195,7 +196,7 @@ export const ConfigDifference = {
  * @param self          the chart object, must use the intervalAccessMixin
  * @returns {number}    ConfigDifference
  */
-export function TimeIntervalDifference(self, props) {
+export function timeIntervalDifference(self, props) {
     const prevAbs = self.getIntervalAbsolute(props);
     const prevSpec = self.getIntervalSpec(props);
 

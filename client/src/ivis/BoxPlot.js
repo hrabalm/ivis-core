@@ -14,7 +14,7 @@ import PropTypes from "prop-types";
 import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
 import {Tooltip} from "./Tooltip";
-import {ConfigDifference, extentWithMargin, TimeIntervalDifference} from "./common";
+import {ConfigDifference, extentWithMargin, timeIntervalDifference} from "./common";
 import {PropType_d3Color, PropType_NumberInRange} from "../lib/CustomPropTypes";
 import commonStyles from "./commons.scss";
 
@@ -165,7 +165,7 @@ export class BoxPlot extends Component {
         // test if time interval changed
         const considerTs =  this.props.config.signalSets.some(setConf => !!setConf.tsSigCid);
         if (considerTs)
-            configDiff = Math.max(configDiff, TimeIntervalDifference(this, prevProps));
+            configDiff = Math.max(configDiff, timeIntervalDifference(this, prevProps));
 
         if (configDiff === ConfigDifference.DATA_WITH_CLEAR) {
             this.setState({

@@ -63,8 +63,9 @@ from ivis import ivis
 es = ivis.elasticsearch
 state = ivis.state
 
-params= ivis.parameters
+params= ivis.params
 entities= ivis.entities
+owned = ivis.owned
 
 sigSet = params['sigSet']
 value_sig = params['value']
@@ -82,8 +83,12 @@ ts_sig = params['ts']
 #print(json.dumps(entities, indent=2))
 #print()
 
+#print('Owned entities:')
+#print(json.dumps(owned, indent=2))
+#print()
 
-if state is None or state.get('api_set') is None:
+
+if owned.get('signalSets').get('api_set') is None:
   ns = entities['signalSets'][sigSet]['namespace']
 
   # Request new signal set creation 
@@ -99,9 +104,7 @@ if state is None or state.get('api_set') is None:
     "settings": {}
   })
 
-  state = ivis.create_signal_set("api_set",ns,"API test", "API test", None, signals)
-    
-  ivis.store_state(state)
+  ivis.create_signal_set("api_set",ns,"API test", "API test", None, signals)
 
 # FILES
 with open('../files/test.txt', 'r') as file: 
@@ -134,10 +137,13 @@ print()
 
 # Elasticsearch indexing
 doc = {
-  state['api_set']['fields']['api_signal']: value
+  entities['signals']['api_set']['api_signal']['field']: value
 }
-res = es.index(index=state['api_set']['index'], doc_type='_doc', body=doc)
+res = es.index(index=entities['signalSets']['api_set']['index'], doc_type='_doc', body=doc)
 
+state = {
+  'last': value
+}
 ivis.store_state(state)
 `
     };
@@ -185,7 +191,7 @@ from io import StringIO
 
 es = ivis.elasticsearch
 state = ivis.state
-params= ivis.parameters
+params= ivis.params
 entities= ivis.entities
 
 if state is None:
@@ -435,7 +441,7 @@ from elasticsearch import helpers
 
 es = ivis.elasticsearch
 state = ivis.state
-params= ivis.parameters
+params= ivis.params
 entities= ivis.entities
 
 # Task parameters' values
@@ -564,7 +570,7 @@ from ivis import ivis
 es = ivis.elasticsearch
 state = ivis.state
 
-params= ivis.parameters
+params= ivis.params
 entities= ivis.entities
 
 sig_set = entities['signalSets'][params['sigSet']]
@@ -749,7 +755,7 @@ from dtw import dtw
 
 es = ivis.elasticsearch
 state = ivis.state
-params= ivis.parameters
+params= ivis.params
 entities= ivis.entities
 
 # Get ES index and fields

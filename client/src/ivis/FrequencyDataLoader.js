@@ -7,7 +7,7 @@ import {withAsyncErrorHandler, withErrorHandling} from "../lib/error-handling";
 import PropTypes from "prop-types";
 import {withComponentMixins} from "../lib/decorator-helpers";
 import {withTranslation} from "../lib/i18n";
-import {TimeIntervalDifference} from "./common";
+import {timeIntervalDifference} from "./common";
 
 @withComponentMixins([
     withTranslation,
@@ -43,7 +43,7 @@ export class FrequencyDataLoader extends Component {
 
         const considerTs = !!this.props.config.tsSigCid;
         if (considerTs)
-            propsDiff |= TimeIntervalDifference(this, prevProps);
+            propsDiff |= timeIntervalDifference(this, prevProps);
 
         if (propsDiff)
             this.reloadData();

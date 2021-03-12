@@ -24,7 +24,7 @@ import {Tooltip} from "./Tooltip";
 import {Button, CheckBox, Form, InputField, withForm} from "../lib/form";
 import styles from "./CorrelationCharts.scss";
 import {ActionLink, Icon} from "../lib/bootstrap-components";
-import {AreZoomTransformsEqual, ConfigDifference, distance, extentWithMargin, getColorScale, getExtent, isInExtent, isSignalVisible, ModifyColorCopy, setZoomTransform, TimeIntervalDifference, transitionInterpolate, WheelDelta, ZoomEventSources} from "./common";
+import {areZoomTransformsEqual, ConfigDifference, distance, extentWithMargin, getColorScale, getExtent, isInExtent, isSignalVisible, modifyColorCopy, setZoomTransform, timeIntervalDifference, transitionInterpolate, wheelDelta, ZoomEventSources} from "./common";
 import {PropType_d3Color_Required} from "../lib/CustomPropTypes";
 import {dotShapes, dotShapeNames} from "./dot_shapes";
 import {withPageHelpers} from "../lib/page-common";
@@ -509,7 +509,7 @@ export class ScatterPlotBase extends Component {
         // test if time interval changed
         const considerTs =  this.props.config.signalSets.some(setConf => !!setConf.tsSigCid);
         if (considerTs)
-            configDiff = Math.max(configDiff, TimeIntervalDifference(this, prevProps));
+            configDiff = Math.max(configDiff, timeIntervalDifference(this, prevProps));
 
         // test if limits changed
         if (!Object.is(prevProps.xMinValue, this.props.xMinValue) || !Object.is(prevProps.xMaxValue, this.props.xMaxValue) || !Object.is(prevProps.yMinValue, this.props.yMinValue) || !Object.is(prevProps.yMaxValue, this.props.yMaxValue))
@@ -538,7 +538,7 @@ export class ScatterPlotBase extends Component {
                 || prevState.zoomYScaleMultiplier !== this.state.zoomYScaleMultiplier // update zoom extent
                 || configDiff !== ConfigDifference.NONE;
 
-            const updateZoom = !AreZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
+            const updateZoom = !areZoomTransformsEqual(prevState.zoomTransform, this.state.zoomTransform);
 
             this.createChart(forceRefresh, updateZoom);
             this.prevContainerNode = this.containerNode;
@@ -1389,7 +1389,7 @@ export class ScatterPlotBase extends Component {
 
     drawRegressions(xScale, yScale, cScales) {
         for (let i = 0; i < this.globalRegressions.length; i++) {
-            this.globalRegressions[i].color = ModifyColorCopy(this.getRegressionColor( this.globalRegressions[i], cScales), 0.3);
+            this.globalRegressions[i].color = modifyColorCopy(this.getRegressionColor( this.globalRegressions[i], cScales), 0.3);
         }
         for (let i = 0; i < this.regressions.length; i++) {
             this.regressions[i].color = this.getRegressionColor(this.regressions[i], cScales);
@@ -1678,7 +1678,7 @@ export class ScatterPlotBase extends Component {
             .on("end", handleZoomEnd)
             .on("start", handleZoomStart)
             .interpolate(d3Interpolate.interpolate)
-            .wheelDelta(WheelDelta(3));
+            .wheelDelta(wheelDelta(3));
         this.svgContainerSelection.call(this.zoom);
         if (!zoomExisted)
             this.setLimitsToCurrentZoom(); // initialize limits

@@ -83,7 +83,7 @@ async function create(context, task) {
         return id;
     });
 
-    scheduleCreate(id, task.settings);
+    scheduleInit(id, task.settings);
 
     return id;
 }
@@ -137,7 +137,7 @@ async function updateWithConsistencyCheck(context, task) {
         await shares.rebuildPermissionsTx(tx, {entityTypeId: 'task', entityId: task.id});
     });
 
-    scheduleBuildOrCreate(uninitialized, task.id, task.settings)
+    scheduleBuildOrInit(uninitialized, task.id, task.settings)
 }
 
 /**
@@ -189,9 +189,9 @@ async function getParamsById(context, id) {
  * @param id the primary key of the task
  * @param settings
  */
-function scheduleBuildOrCreate(uninitialized, id, settings) {
+function scheduleBuildOrInit(uninitialized, id, settings) {
     if (uninitialized) {
-        scheduleCreate(id, settings);
+        scheduleInit(id, settings);
     } else {
         scheduleBuild(id, settings);
     }
@@ -201,7 +201,7 @@ function scheduleBuild(id, settings) {
     taskHandler.scheduleBuild(id, settings.code, taskHandler.getTaskBuildOutputDir(id));
 }
 
-function scheduleCreate(id, settings) {
+function scheduleInit(id, settings) {
     taskHandler.scheduleInit(id, settings.code, taskHandler.getTaskBuildOutputDir(id));
 }
 
@@ -228,7 +228,7 @@ async function compile(context, id) {
     });
 
     const settings = JSON.parse(task.settings);
-    scheduleBuildOrCreate(uninitialized, id, settings);
+    scheduleBuildOrInit(uninitialized, id, settings);
 }
 
 async function compileAll() {
@@ -238,7 +238,7 @@ async function compileAll() {
         const settings = JSON.parse(task.settings);
         const uninitialized = (task.build_state === BuildState.UNINITIALIZED);
         await knex('tasks').update({build_state: BuildState.SCHEDULED}).where('id', task.id);
-        scheduleBuildOrCreate(uninitialized, task.id, settings);
+        scheduleBuildOrInit(uninitialized, task.id, settings);
     }
 }
 
