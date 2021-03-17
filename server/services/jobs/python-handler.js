@@ -15,7 +15,7 @@ const IVIS_PCKG_DIR = path.join(__dirname, '..', '..', 'lib', 'tasks', 'python',
 
 const runningProc = new Map();
 
-const defaultPythonLibs = ['elasticsearch'];
+const defaultPythonLibs = ['elasticsearch', 'elasticsearch_dsl'];
 const taskSubtypeSpecs = {
     [defaultSubtypeKey]: {
         libs: defaultPythonLibs
