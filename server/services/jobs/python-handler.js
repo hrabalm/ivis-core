@@ -27,7 +27,7 @@ const taskSubtypeSpecs = {
         libs: [...defaultPythonLibs, 'numpy', 'dtw']
     },
     [PythonSubtypes.ARIMA]: {
-        libs: [...defaultPythonLibs, 'numpy', 'statsmodels', 'pmdarima']
+        libs: [...defaultPythonLibs, 'numpy', 'statsmodels', 'pmdarima', 'pendulum']
     }
 };
 
