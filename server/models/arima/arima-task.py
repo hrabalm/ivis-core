@@ -85,13 +85,13 @@ def train_model(params) -> ModelWrapper:
 
     wrapped_model = ModelWrapper(model, delta)
 
-    # Add test data into the model and predict at the same time
+    # Add test data into the model and predict one-ahead at the same time
     process_new_observations(wrapped_model, val_test)
 
     return wrapped_model
 
 def process_new_observations(wrapped_model, observations):
-    pass
+    print(observations)
 
 def store_model(wrapped_model):  # TODO: Storing into files might be better
     new_state = {wrapped_model}
