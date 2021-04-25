@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 from ivis import ivis
-import ivis_ts as ts
+import ivis.ts as ts
+import ivis.ts.arima as ar
 import elasticsearch as es
 import pmdarima as pmd
 import pendulum
@@ -9,21 +10,10 @@ import joblib
 import io
 import base64
 
-es = ivis.elasticsearch
-state = ivis.state
-params = ivis.params
-entities = ivis.entities
-
-def parse_params(params):
-    out = {}
-    for key, value in params.items():
-        key = key.split('__')
-        pass
-
 # Reason we do this is that model itself doesn't deal with timestamps, only a
 # series of data. ModelWrapper adds this handling of timestamps
 class ModelWrapper:
-    def __init__(self, trained_model: ts.ArimaPredictor, delta):
+    def __init__(self, trained_model: ar.ArimaPredictor, delta):
         self.trained_model = trained_model
         self.delta = delta
 
@@ -40,11 +30,17 @@ class ModelWrapper:
         self.delta.set_latest(timestamps[-1]) # TODO: Only usable when passed timestamps
         return timestamps, predictions
 
+def get_source_index_name(params):
+    return ivis.entities['signalSets'][params['sigSet']]['index']
+
+def get_source_index_field_name(params, field_name):
+    return ivis.entities['signals'][params['sigSet']][field_name]['field']
+
 def create_data_reader(params):
     # TODO: Temporary
-    index_name = 'mhn-co2'
-    ts_field = 'ts'
-    value_field = 'value'
+    index_name = get_source_index_name(params)
+    ts_field = get_source_index_field_name(params, 'ts')
+    value_field = get_source_index_field_name(params, 'value')
 
     if True:
         reader = ts.TsReader(index_name, ts_field, value_field)
@@ -83,7 +79,7 @@ def train_model(params) -> ModelWrapper:
         model.fit(val_train)
 
     # convert to custom predictor if possible - TODO: Maybe raise except?
-    model = ts.ArimaPredictor(model, val_train)
+    model = ar.ArimaPredictor(model, val_train)
     # TODO: TsDeltaLogical instead if working with aggregation
     delta = ts.estimate_delta(ts_train)
 
@@ -101,10 +97,10 @@ def store_model(wrapped_model):  # TODO: Storing into files might be better
     new_state = {wrapped_model}
     f = io.BytesIO()
     joblib.dump(new_state, f, compress=('xz', 6))
-    b = base64.b64encode((f.getvalue()).decode("utf-8"))
+    b = base64.b64encode(f.getvalue()).decode('ascii')
     ivis.store_state(b)
 
-def load_model():
+def load_model(state):
     old_state = state
     old_state = base64.b64decode(old_state)
     f = io.BytesIO(old_state)
@@ -112,11 +108,19 @@ def load_model():
     print(old_state)
 
 def main():
+    es = ivis.elasticsearch
+    state = ivis.state
+    params = ivis.params
+    entities = ivis.entities
+
     # Parse params, decide what to do
     if state is None: # job is running for a first time
-        pass  # train new model
+        # train new model
+        model = train_model(params)
+        store_model(model)
     else:
-        pass  # load existing model
+        # load existing model
+        load_model(state)
 
 if __name__ == "__main__":
     main()
