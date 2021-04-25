@@ -50,7 +50,7 @@ class ArimaPredictor:
 
     def _add1(self, x):  # add a new observation `x` to the model
         prediction = self.predict(1)[0]
-        residual = (x - prediction)
+        residual = x - prediction
 
         # Note: append creates copy of the whole array
         self.data = np.append(self.data, x)
@@ -84,7 +84,7 @@ class ArimaPredictor:
         """
         predictions = []
         for x in observations:
-            predictions.append(self.predict(1))
+            predictions.append(self.predict(1)[0])
             self._add1(x)
 
         self.shrink()
