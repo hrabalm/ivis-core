@@ -9,10 +9,12 @@ import pendulum
 import joblib
 import io
 import base64
+import logging
 
-# Reason we do this is that model itself doesn't deal with timestamps, only a
-# series of data. ModelWrapper adds this handling of timestamps
+
 class ModelWrapper:
+    """Wraps around our ARIMA model and adds handling of timestamps."""
+
     def __init__(self, trained_model: ar.ArimaPredictor, delta):
         self.trained_model = trained_model
         self.delta = delta
@@ -27,39 +29,69 @@ class ModelWrapper:
         delta = self.delta.copy()
         timestamps = [delta.read() for _ in observations]
         predictions = self.trained_model.append_predict(observations)
-        self.delta.set_latest(timestamps[-1]) # TODO: Only usable when passed timestamps
+        # TODO: Only usable when passed timestamps
+        self.delta.set_latest(timestamps[-1])
         return timestamps, predictions
+
 
 def get_source_index_name(params):
     return ivis.entities['signalSets'][params['sigSet']]['index']
 
+
 def get_source_index_field_name(params, field_name):
     return ivis.entities['signals'][params['sigSet']][field_name]['field']
 
+
+def get_max_training_ts(params) -> str:
+    """Return the first timestamp that should not be used as training data and
+    validation data during the first run. This is needed when working with large
+    signal set that may not fit into the memory."""
+    return ''  # TODO: From params
+
+
+def get_training_portion(params) -> float:
+    """Return what portion of the first batch is used for training the model."""
+    return 0.75 # TODO
+
+
+def get_is_autoarima(params) -> bool:
+    return True
+
+def get_arima_order(params):
+    """ARIMA order, e.g. (5,0,1). Only applicable when not using autoarima."""
+    return (5, 0, 1)
+
 def create_data_reader(params):
-    # TODO: Temporary
+    # Creates two readers, one for the first batch of data (training and
+    # validation) that will be read at once. The other for all remaining and
+    # future data
     index_name = get_source_index_name(params)
     ts_field = get_source_index_field_name(params, 'ts')
     value_field = get_source_index_field_name(params, 'value')
 
+    # first ts that is not potentially part of the training data
+    split_ts = get_max_training_ts(params)
+
     if True:
-        reader = ts.TsReader(index_name, ts_field, value_field)
+        reader = ts.TsReader(index_name, ts_field,
+                             value_field, to_ts=split_ts)
     else:
         # ex.
-        reader = ts.TsAggReader(index_name, ts_field, value_field, '1M')
+        reader = ts.TsAggReader(index_name, ts_field,
+                                value_field, '1M', from_ts=split_ts)
 
     return reader
 
+
 def train_model(params) -> ModelWrapper:
-    train_percentage = 0.75
-    autoarima = True
-    # parse params
+    train_percentage = get_training_portion(params)
+    autoarima = get_is_autoarima(params)
 
     # create readers and writers
-    reader = create_data_reader(params)
+    reader_train = create_data_reader(params)
 
     # load training data
-    timestamps, values = reader.read()
+    timestamps, values = reader_train.read()
 
     # convert signal values from str to float
     values = list(map(float, values))
@@ -74,11 +106,15 @@ def train_model(params) -> ModelWrapper:
     # to guess these timestamps the same way we will have to when actually
     # predicting the future values
 
+    logging.info(f"Training model on dataset of size {len(val_train)}")
+    logging.info(f"Validating model on dataset of size {len(val_test)}")
+
     # train model
     if autoarima:
         model = pmd.auto_arima(val_train)
     else:
-        model = pmd.ARIMA((5, 0, 0))
+        order = get_arima_order(params)
+        model = pmd.ARIMA(order)
         model.fit(val_train)
 
     # convert to custom predictor if possible - TODO: Maybe raise except?
@@ -91,17 +127,21 @@ def train_model(params) -> ModelWrapper:
     # Add test data into the model and predict one-ahead at the same time
     process_new_observations(wrapped_model, val_test)
 
-    return wrapped_model, reader
+    # Remove the boundary from the reader and reuse it to read the following
+    # values
+    reader_future = reader_train
+    reader_future.to_ts = ''
+
+    return wrapped_model, reader_future
+
 
 def process_new_observations(wrapped_model, observations):
-    #print(observations)
-    predictions = []
-    #print(f"new observations: {observations}", end=" ")
-    #observations = list(map(float, observations))
-    predictions = wrapped_model.append_predict(observations)
+    logging.info(f"Processing {len(observations)} new observations.")
 
+    predictions = wrapped_model.append_predict(observations)
     print(f"predictions: {predictions}")
     return predictions
+
 
 def store_model(wrapped_model, reader):  # TODO: Storing into files might be better
     new_state = {
@@ -113,6 +153,7 @@ def store_model(wrapped_model, reader):  # TODO: Storing into files might be bet
     b = base64.b64encode(f.getvalue()).decode('ascii')
     ivis.store_state(b)
 
+
 def load_model(state):
     old_state = state
     old_state = base64.b64decode(old_state)
@@ -122,6 +163,7 @@ def load_model(state):
 
     return old_state['wrapped_model'], old_state['reader']
 
+
 def main():
     es = ivis.elasticsearch
     state = ivis.state
@@ -129,7 +171,7 @@ def main():
     entities = ivis.entities
 
     # Parse params, decide what to do
-    if state is None: # job is running for a first time
+    if state is None:  # job is running for a first time
         # train new model
         model, reader = train_model(params)
         store_model(model, reader)
@@ -151,5 +193,8 @@ def main():
         # store the updated model and reader
         store_model(model, reader)
 
+
 if __name__ == "__main__":
+    import sys
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     main()
