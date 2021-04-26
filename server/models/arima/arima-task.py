@@ -61,6 +61,9 @@ def train_model(params) -> ModelWrapper:
     # load training data
     timestamps, values = reader.read()
 
+    # convert signal values from str to float
+    values = list(map(float, values))
+
     # split into training and the first batch of validation
     ts_train, _ = pmd.model_selection.train_test_split(
         timestamps, train_size=train_percentage)
@@ -88,13 +91,23 @@ def train_model(params) -> ModelWrapper:
     # Add test data into the model and predict one-ahead at the same time
     process_new_observations(wrapped_model, val_test)
 
-    return wrapped_model
+    return wrapped_model, reader
 
 def process_new_observations(wrapped_model, observations):
-    print(observations)
+    #print(observations)
+    predictions = []
+    #print(f"new observations: {observations}", end=" ")
+    #observations = list(map(float, observations))
+    predictions = wrapped_model.append_predict(observations)
 
-def store_model(wrapped_model):  # TODO: Storing into files might be better
-    new_state = {wrapped_model}
+    print(f"predictions: {predictions}")
+    return predictions
+
+def store_model(wrapped_model, reader):  # TODO: Storing into files might be better
+    new_state = {
+        'wrapped_model': wrapped_model,
+        'reader': reader
+    }
     f = io.BytesIO()
     joblib.dump(new_state, f, compress=('xz', 6))
     b = base64.b64encode(f.getvalue()).decode('ascii')
@@ -107,6 +120,8 @@ def load_model(state):
     old_state = joblib.load(f)
     print(old_state)
 
+    return old_state['wrapped_model'], old_state['reader']
+
 def main():
     es = ivis.elasticsearch
     state = ivis.state
@@ -116,11 +131,25 @@ def main():
     # Parse params, decide what to do
     if state is None: # job is running for a first time
         # train new model
-        model = train_model(params)
-        store_model(model)
+        model, reader = train_model(params)
+        store_model(model, reader)
     else:
         # load existing model
-        load_model(state)
+        model, reader = load_model(state)
+
+        # read new observations
+        timestamps, values = reader.read()
+
+        # TODO: I think I should update delta estimator using the
+        # latest timestamp
+
+        values = list(map(float, values))
+
+        predictions = process_new_observations(model, values)
+        print(predictions)
+
+        # store the updated model and reader
+        store_model(model, reader)
 
 if __name__ == "__main__":
     main()
