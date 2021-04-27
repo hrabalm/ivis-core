@@ -5,6 +5,7 @@ import sys
 from .exceptions import *
 
 from elasticsearch import Elasticsearch
+import elasticsearch.helpers as esh
 
 
 class Ivis:
@@ -124,6 +125,76 @@ class Ivis:
 
         Ivis._send_request_message(msg)
         return Ivis._get_response_message()
+
+    def get_signal_set_index(self, set_cid):
+        """Return the elasticsearch index of a given signal set."""
+        return self.entities['signalSets'][set_cid]['index']
+
+    def get_signal_field(self, set_cid, signal_cid):
+        """Return the field name of a given signal in given signal set used in es"""
+        return self.entities['signals'][set_cid][signal_cid]['index']
+
+    def translate_record(self, set_cid: str, record):
+        """Translate records signal cids to corresponding elasticsearch fields
+
+        Example usage:
+        record = {
+            'ts': '2021-01-01T00:00:00.000Z',
+            'value': 42
+        }
+
+        record = ivis.translate_record('signal_set_cid', record)
+
+        record is now:
+        {
+            's1': '2021-01-01T00:00:00.000Z',
+            's2': 42
+        }
+
+        where s1, s2 are field names used by elasticsearch index storing the
+        signal set
+        """
+        doc = {}
+        for key, value in record.items():
+            es_key = ivis.entities['signals'][set_cid][key]['field']
+            doc[es_key] = value
+
+        return doc
+
+    def insert_record(self, set_cid: str, record):
+        """Insert a single record into a signal set
+        Args:
+            set_cid (str): cid of the signal set
+            record ([type]): dictionary containing signal values, indexed by signal cids (as opposed to real es fields)
+        """
+        index = self.get_signal_set_index(set_cid)
+        doc = self.translate_record(set_cid, record)
+        # TODO: Type may need to be removed in elastic 7+
+        self.elasticsearch.index(index, doc_type='_doc', body=doc)
+
+    def insert_records(self, set_cid: str, records):
+        """Insert multiple records into a signal set. Elasticsearch Bulk API is
+        used and consequently using  this method should be faster than inserting
+        the records one by one.
+
+        Args:
+            set_cid (str): cid of the signal set
+            records ([type]): iterable of records
+        """
+        def create_reqs(set_cid: str, docs):
+            """Fill index and doctype so that we can use these requests in bulk
+            """
+            index = self.get_signal_set_index(set_cid)
+            for doc in docs:
+                yield {
+                    '_index': index,
+                    # TODO: Type may need to be removed in elastic 7+
+                    '_type': '_doc',
+                    **doc
+                }
+        docs = (self.translate_record(set_cid, record) for record in records)
+        requests = create_reqs(set_cid, docs)
+        esh.bulk(self.elasticsearch, requests)
 
 
 ivis = Ivis()
