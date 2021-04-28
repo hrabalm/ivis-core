@@ -204,12 +204,24 @@ class Ivis:
         """
         index = self.get_signal_set_index(set_cid)
 
-        # Currently, delete_by_query is used. Deleting the index and then
-        # recreating it could potentially be faster - however types and
-        # mappings are lost in the process. I am not sure whether there
-        # are any consequences for our use case.
-        body = {'query': {'match_all': {}}}
-        ivis.elasticsearch.delete_by_query(index=index, body=body)
+        # Originally, delete_by_query was used.
+        # body = {'query': {'match_all': {}}}
+        # ivis.elasticsearch.delete_by_query(index=index, body=body)
+
+        # The problem with the original solution is that if .delete_by_query is
+        # soon followed by .index, version_conflicts can occur.
+
+        # Instead, index is now deleted and a new one is created.
+
+        # The advantage of this solution, that index can be called immediately
+        # after the index is created.
+
+        # Get old index mappings so that we can migrate them to the new index
+        mappings = ivis.elasticsearch.indices.get_mapping(index=index)
+        # settings = ivis.elasticsearch.indices.get_settings(index=index)
+        body = mappings[index]
+        ivis.elasticsearch.indices.delete(index=index)
+        ivis.elasticsearch.indices.create(index=index, body=body)
 
 
 ivis = Ivis()
