@@ -196,5 +196,20 @@ class Ivis:
         requests = create_reqs(set_cid, docs)
         esh.bulk(self.elasticsearch, requests)
 
+    def clear_records(self, set_cid: str):
+        """Deletes all records stored in a given (computed) signal set
+
+        Args:
+            set_cid (str): Signal set cid
+        """
+        index = self.get_signal_set_index(set_cid)
+
+        # Currently, delete_by_query is used. Deleting the index and then
+        # recreating it could potentially be faster - however types and
+        # mappings are lost in the process. I am not sure whether there
+        # are any consequences for our use case.
+        body = {'query': {'match_all': {}}}
+        ivis.elasticsearch.delete_by_query(index=index, body=body)
+
 
 ivis = Ivis()
