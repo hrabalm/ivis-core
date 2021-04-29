@@ -160,30 +160,40 @@ async function listRunningDTAjax(context, params) {
  */
 async function create(context, job) {
     return await knex.transaction(async tx => {
-        await shares.enforceEntityPermissionTx(tx, context, 'namespace', job.namespace, 'createJob');
-        await namespaceHelpers.validateEntity(tx, job);
-
-        const exists = await tx('tasks').where({id: job.task}).first();
-        enforce(exists != null, 'Task doesn\'t exists');
-
-        const filteredEntity = filterObject(job, allowedKeys);
-        filteredEntity.params = JSON.stringify(filteredEntity.params);
-
-        filteredEntity.delay = parseTriggerStr(filteredEntity.delay);
-        filteredEntity.min_gap = parseTriggerStr(filteredEntity.min_gap);
-        filteredEntity.trigger = parseTriggerStr(filteredEntity.trigger);
-
-        const ids = await tx('jobs').insert(filteredEntity);
-        const id = ids[0];
-
-        if (job.signal_sets_triggers) {
-            await updateSetTriggersTx(tx, id, job.signal_sets_triggers);
-        }
-
-        await shares.rebuildPermissionsTx(tx, {entityTypeId: 'job', entityId: id});
-
-        return id;
+        return await createTx(tx, context, job);
     });
+}
+
+/**
+ * Creates job.
+ * @param context
+ * @param job the job we want to create
+ * @returns {Promise<any>} id of the created job
+ */
+async function createTx(tx, context, job) {
+    await shares.enforceEntityPermissionTx(tx, context, 'namespace', job.namespace, 'createJob');
+    await namespaceHelpers.validateEntity(tx, job);
+
+    const exists = await tx('tasks').where({ id: job.task }).first();
+    enforce(exists != null, 'Task doesn\'t exists');
+
+    const filteredEntity = filterObject(job, allowedKeys);
+    filteredEntity.params = JSON.stringify(filteredEntity.params);
+
+    filteredEntity.delay = parseTriggerStr(filteredEntity.delay);
+    filteredEntity.min_gap = parseTriggerStr(filteredEntity.min_gap);
+    filteredEntity.trigger = parseTriggerStr(filteredEntity.trigger);
+
+    const ids = await tx('jobs').insert(filteredEntity);
+    const id = ids[0];
+
+    if (job.signal_sets_triggers) {
+        await updateSetTriggersTx(tx, id, job.signal_sets_triggers);
+    }
+
+    await shares.rebuildPermissionsTx(tx, { entityTypeId: 'job', entityId: id });
+
+    return id;
 }
 
 /**
@@ -350,6 +360,7 @@ module.exports.listOwnedSignalSetsDTAjax = listOwnedSignalSetsDTAjax;
 module.exports.listRunningDTAjax = listRunningDTAjax;
 module.exports.listByTaskDTAjax = listByTaskDTAjax;
 module.exports.create = create;
+module.exports.createTx = createTx;
 module.exports.updateWithConsistencyCheck = updateWithConsistencyCheck;
 module.exports.remove = remove;
 module.exports.removeRun = removeRun;
