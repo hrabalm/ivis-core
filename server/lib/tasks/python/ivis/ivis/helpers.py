@@ -218,8 +218,17 @@ class Ivis:
 
         # Get old index mappings so that we can migrate them to the new index
         mappings = ivis.elasticsearch.indices.get_mapping(index=index)
-        # settings = ivis.elasticsearch.indices.get_settings(index=index)
         body = mappings[index]
+
+        # Also migrate relevant settings of the previous index
+        settings = ivis.elasticsearch.indices.get_settings(index=index)
+        wanted = ['number_of_shards', 'number_of_replicas']
+        body['settings'] = {
+            'index': {
+                k: v for k, v in settings[index]['settings']['index'].items() if k in wanted
+            }
+        }
+
         ivis.elasticsearch.indices.delete(index=index)
         ivis.elasticsearch.indices.create(index=index, body=body)
 
