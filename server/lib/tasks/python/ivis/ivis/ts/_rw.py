@@ -1,25 +1,14 @@
 import abc
-try:
-    # IVIS currently uses Elasticsearch 6 and its documentation discourages
-    # from using python library whose major vesion is not matching
-    # https://elasticsearch-py.readthedocs.io/en/latest/
-    import elasticsearch6 as es
-    import elasticsearch6.helpers as esh
-    import elasticsearch6_dsl as dsl
-except:
-    import elasticsearch as es
-    import elasticsearch.helpers as esh
-    import elasticsearch_dsl as dsl
+import elasticsearch as es
+import elasticsearch.helpers as esh
+import elasticsearch_dsl as dsl
 import datetime as dt
 import dateutil as du
 import numpy as np
 import pendulum
+import logging
 
-try:
-    from ivis import ivis
-except:
-    class ivis:  # stub for local testing
-        elasticsearch = es.Elasticsearch('localhost')
+from ivis import ivis
 
 DATEFORMAT = "YYYY-MM-DD[T]HH:mm:ss.SSS[Z]"  # brackets are used for escaping
 
@@ -138,7 +127,7 @@ pythondateformat2 = "%Y-%m-%dT%H:%M:%S"
 
 class TsAggReader:
     def __init__(self, index_name, ts_field, value_field, agg_interval,
-                 agg_method='avg'):
+                 agg_method='avg', from_ts=None):
         self.index_name = index_name
         self.ts_field = ts_field
         self.value_field = value_field
@@ -146,7 +135,7 @@ class TsAggReader:
         self.agg_method = agg_method
         self.agg_interval = agg_interval
 
-        self.latest_ts = None
+        self.latest_ts = from_ts
 
     def set_latest(self, ts):
         self.latest_ts = ts
