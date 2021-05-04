@@ -5,6 +5,7 @@ const moment = require('moment');
 const signalSets = require('../../models/signal-sets');
 const signalSetsAggregations = require('../../models/signal-set-aggregations');
 const signalSetsPredictions = require('../../models/signal-set-predictions');
+const arima = require('../../models/predictions-arima');
 const panels = require('../../models/panels');
 const templates = require('../../models/templates');
 const users = require('../../models/users');
@@ -195,7 +196,7 @@ router.postAsync('/signal-set-aggregations-table/:signalSetId', passport.loggedI
 });
 
 router.postAsync('/signal-sets/:signalSetId/predictions/arima', passport.loggedIn, passport.csrfProtection, async (req, res) => {
-    return res.json(await signalSetsPredictions.create(req.context, castToInteger(req.params.signalSetId), req.body));
+    return res.json(await arima.create(req.context, castToInteger(req.params.signalSetId), req.body));
 })
 
 router.postAsync('/signal-set-predictions-table/:signalSetId', passport.loggedIn, async (req, res) => {
