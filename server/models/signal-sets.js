@@ -203,6 +203,10 @@ async function createTx(tx, context, entity) {
     await shares.rebuildPermissionsTx(tx, {entityTypeId: 'signalSet', entityId: id});
 
     if (filteredEntity.kind === SignalSetKind.TIME_SERIES) {
+        let source = SignalSource.RAW;
+        if (filteredEntity.type === SignalSetType.COMPUTED) {
+            source = SignalSource.JOB;
+        }
         await signals.createTx(tx, context, id, {
             cid: 'ts',
             name: 'Timestamp',
@@ -210,7 +214,7 @@ async function createTx(tx, context, entity) {
             namespace: entity.namespace,
             type: SignalType.DATE_TIME,
             set: id,
-            source: SignalSource.RAW
+            source: source
         });
     }
 
