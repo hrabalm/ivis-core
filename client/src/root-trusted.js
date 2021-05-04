@@ -54,6 +54,7 @@ import AggregationsCUD from './settings/signal-sets/AggregationsCUD';
 import SignalSetPredictions from './settings/signal-sets/Predictions';
 import PredictionsArimaCUD from './settings/signal-sets/PredictionsArimaCUD';
 import PredictionsCompare from './settings/signal-sets/PredictionsCompare';
+import ArimaOverview from './settings/signal-sets/ArimaOverview';
 import RecordsList from './settings/signal-sets/RecordsList';
 import RecordsCUD from './settings/signal-sets/RecordsCUD';
 
@@ -491,11 +492,21 @@ const getStructure = t => {
                                         visible: resolved => resolved.signalSet.permissions.includes('view') && resolved.signalSet.kind === SignalSetKind.TIME_SERIES,
                                         panelRender: props => <SignalSetPredictions signalSet={props.resolved.signalSet} />, // TODO
                                         children: {
-                                            'create-arima': {
-                                                title: t('Add ARIMA model'),
-                                                link: params => `/settings/signal-sets/${params.signalSetId}/predictions/create-arima`,
-                                                // visible: resolved => false && resolved, // isn't really shown anywhere
-                                                panelRender: props => <PredictionsArimaCUD signalSet={props.resolved.signalSet} action="create" />
+                                            'arima': {
+                                                children: {
+                                                    'create': {
+                                                        title: t('Add ARIMA model'),
+                                                        link: params => `/settings/signal-sets/${params.signalSetId}/predictions/arima`,
+                                                        // visible: resolved => false && resolved, // isn't really shown anywhere
+                                                        panelRender: props => <PredictionsArimaCUD signalSet={props.resolved.signalSet} action="create" />,
+                                                    },
+                                                    ':modelId([0-9]+)': {
+                                                        title: t('ARIMA model overview'),
+                                                        link: params => `/settings/signal-sets/${params.signalSetId}/predictions/arima`,
+                                                        // visible: resolved => false && resolved, // isn't really shown anywhere
+                                                        panelRender: props => <ArimaOverview signalSet={props.resolved.signalSet} action="create" />,
+                                                    }
+                                                }
                                             },
                                             'compare': {
                                                 title: t('Compare models'),

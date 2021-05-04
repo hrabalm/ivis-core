@@ -12,6 +12,15 @@ import base64
 import logging
 
 
+output_config = ivis.params['output_config']
+import json
+print(f"ivis.entities: {json.dumps(ivis.entities, indent=4)}")
+print(f"output_config: {json.dumps(output_config, indent=4)}")
+
+DATEFORMAT = "YYYY-MM-DD[T]HH:mm:ss.SSS[Z]"  # brackets are used for escaping
+def _date2string(date: pendulum.DateTime):
+    return date.format(DATEFORMAT)
+
 class ModelWrapper:
     """Wraps around our ARIMA model and adds handling of timestamps."""
 
@@ -111,6 +120,9 @@ def get_arima_order(params):
     """ARIMA order, e.g. (5,0,1). Only applicable when not using autoarima."""
     return (5, 0, 1)
 
+def get_ahead_count(params):
+    return params['futurePredictions']
+
 
 def get_is_aggregated(params) -> bool:
     if 'resampling' in params and params['resampling']:
@@ -121,6 +133,17 @@ def get_is_aggregated(params) -> bool:
 
 def get_aggregation_interval(params) -> str:
     return params['resampling_interval']
+
+
+def write_predictions(params, timestamps, values):
+    with ts.PredictionsWriter(output_config) as writer:
+        writer.clear_future()
+        for ahead, (t, v) in enumerate(zip(timestamps, values), start=1):
+            record = {
+                'ts': t,
+                'predicted_value': v
+            }
+            writer.write(record, ahead)
 
 
 def create_data_reader(params):
@@ -201,8 +224,13 @@ def train_model(params) -> ModelWrapper:
 def process_new_observations(wrapped_model, timestamps, observations):
     logging.info(f"Processing {len(observations)} new observations.")
 
-    predictions = wrapped_model.append_predict(timestamps, observations)
-    return predictions
+    ahead_count = get_ahead_count(ivis.params)
+
+    for t, o in zip(timestamps, observations):
+        wrapped_model.append1(t, o)
+
+        timestamps_pred, predictions = wrapped_model.predict(ahead_count)
+        write_predictions(ivis.params, timestamps_pred, predictions)
 
 
 def store_model(wrapped_model, reader):  # TODO: Storing into files might be better
@@ -251,9 +279,7 @@ def main():
 
         values = list(map(float, values))
 
-        predictions = process_new_observations(model, timestamps, values)
-        print(f"timestamps: {timestamps}")
-        print(f"predictions: {predictions}")
+        process_new_observations(model, timestamps, values)
 
         # store the updated model and reader
         store_model(model, reader)
@@ -262,4 +288,5 @@ def main():
 if __name__ == "__main__":
     import sys
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    print(ivis.params)
     main()

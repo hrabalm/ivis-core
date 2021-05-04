@@ -16,14 +16,9 @@ def _string2date(s: str):
     # convert timestamps to pendulum.DateTime
     return pendulum.from_format(s, DATEFORMAT)
 
+
 def _date2string(date: pendulum.DateTime):
     return date.format(DATEFORMAT)
-
-
-class TsWriter:
-    def __init__(self, index_name, ts_field, value_field):
-        pass
-
 
 class TsReader:
     def __init__(self, index_name, ts_field, value_field, from_ts='', to_ts=''):
@@ -379,25 +374,6 @@ def _create_predictions_signal_set(set_name: str, namespace: int):
 def _get_field(set_name: str, field_name: str):
     return ivis.entities['signals'][set_name][field_name]['field']
 
-class PredWriter:
-    # note: has to handle delta estimation - via object we give to it
-    def __init__(self, index_name, time_delta):
-        self.time_delta = time_delta
-
-    def write1(self, ts, pred):
-        pass
-
-
 class PredReader:
     def __init__(self, index_name):
         self.TsReader = TsReader(index_name, 'ts', 'value')
-
-if __name__ == "__main__":
-    def test():
-        tsr = TsReader('mhn-co2', 'ts', 'value')
-        print(tsr._read())
-
-        tsar = TsAggReader('mhn-co2', 'ts', 'value', '1M')
-        print(tsar.read())
-
-    test()

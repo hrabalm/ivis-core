@@ -185,9 +185,21 @@ export default class CUD extends Component {
                         selectionLabelIndex={2}
                         selectionKeyIndex={1}
                         dataUrl={`rest/signals-table-by-cid/${this.props.signalSet.cid}`}
+                        dataFilter={array => {
+                            // don't show timestamp as a signal to predict
+                            let out = [];
+                            for (let x of array) {
+                                console.log(JSON.stringify(x));
+                                // x is array of signal set fields
+                                if (x[1] !== 'ts') { // 'id' != 'ts'
+                                    out.push(x);
+                                }
+                            }
+                            return out;
+                        }}
                         columns={signalColumns2}
                     />
-
+                    {/*
                     <CheckBox id="useAggregation" label={t('Use bucket aggregation')} />
                     {useAggregation &&
                         <InputField id="bucketSize" label={t('Bucket interval')} withHints={['1h', '1d', '1w', '1M']}/>
@@ -195,7 +207,7 @@ export default class CUD extends Component {
                     <CheckBox id="isSeasonal" label={t('Use seasonal model')} />
                     {isSeasonal &&
                         <InputField id='seasonality_m' label={t('Seasonality m')} help={t('What is the period of seasonality? (integer)')} />
-                    }
+                    }*/}
                     <CheckBox id="autoarima" label={t('Use auto arima')} />
 
                     <InputField id="futurePredictions" label="Future predictions" help={t('How many predictions into the future do we want to generate?')}/>

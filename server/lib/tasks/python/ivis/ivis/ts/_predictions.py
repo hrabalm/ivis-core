@@ -1,7 +1,18 @@
 import logging
 
 from collections import defaultdict
+from itertools import chain
 from ivis import ivis
+
+def ensure_output_sets_exist(output_config):
+    source_set = output_config['source_set']
+    namespace = ivis.entities['signalSets'][source_set]['namespace']
+    future_sets = [output_config['future_set']]
+    ahead_sets = output_config['ahead_sets'].values()
+    for set_cid in chain(future_sets, ahead_sets):
+        if set_cid not in ivis.entities['signalSets']:
+            ivis.create_signal_set(
+                set_cid, namespace, signals=output_config['signals'])
 
 class PredictionsWriter:
     """Helper object for writing time series predictions following the common
@@ -46,7 +57,7 @@ class PredictionsWriter:
         self.buffer_size = buffer_size
 
     def _ahead_set(self, ahead: int):
-        return self.config['ahead_sets'][ahead]
+        return self.config['ahead_sets'][str(ahead)]
 
     def _future_set(self):
         return self.config['future_set']

@@ -6,13 +6,13 @@ import { withComponentMixins } from "../../lib/decorator-helpers";
 import { withTranslation } from "../../lib/i18n";
 import { Panel } from "../../lib/panel";
 import { Table } from "../../lib/table";
-import { Toolbar, LinkButton } from "../../lib/page";
+import { Toolbar, LinkButton, requiresAuthenticatedUser } from "../../lib/page";
 
 @withComponentMixins([
     withTranslation,
     //withErrorHandling,
     //withPageHelpers,
-    //requiresAuthenticatedUser
+    requiresAuthenticatedUser
 ])
 export default class PredictionsList extends Component {
     constructor(props) {
@@ -27,8 +27,26 @@ export default class PredictionsList extends Component {
         const t = this.props.t;
         const sigSetId = this.props.signalSet.id;
         const columns = [
-            { data: 0, title: t('id(debug)'), render: data => `${data}` },
-            { data: 1, title: t('sigSetId(debug)'), render: data => `${data}` },
+            { data: 0, title: t('id'), render: data => `${data}` },
+            {
+                data: 2, title: t('Name'),
+                actions: data => {
+                    const modelId = data[0];
+                    const sigSetId = data[1];
+                    const label = data[2]; // Model name
+                    const type = data[3]; // Model type
+
+                    // TODO: check permissions (see signal-sets/List.js)
+                    return [
+                        {
+                            label,
+                            link: `/settings/signal-sets/${sigSetId}/predictions/${type}/${modelId}`
+                        }
+                    ];
+                }
+            },
+            { data: 3, title: t('Type'), render: data => `${data}` },
+            /*{ data: 1, title: t('sigSetId(debug)'), render: data => `${data}` },
             {
                 data: 2,
                 title: t('Name'),
@@ -59,7 +77,7 @@ export default class PredictionsList extends Component {
                     // tableAddDeleteButton(actions, this, perms)
 
                     return actions;
-            }}
+            }}*/
         ]
         return (
             <Panel title={t('Predictions')}>
@@ -68,7 +86,7 @@ export default class PredictionsList extends Component {
                     <LinkButton to={`/settings/signal-sets/${sigSetId}/predictions/compare`} className="btn-primary"
                         //icon="plus"
                         label={t('Compare models')} />
-                    <LinkButton to={`/settings/signal-sets/${sigSetId}/predictions/create-arima`} className="btn-primary"
+                    <LinkButton to={`/settings/signal-sets/${sigSetId}/predictions/arima/create`} className="btn-primary"
                         icon="plus"
                         label={t('Add ARIMA model')} />
                 </Toolbar>
