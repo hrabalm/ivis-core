@@ -89,21 +89,40 @@ async function update(context, prediction) {
     });
 }
 
+/**
+ * Return predicted signals
+ * @param context the calling user's context
+ * @param predictionId
+ * @returns an array of signals
+ */
+async function _getOutputSignals(tx, context, predictionId) {
+    await shares.enforceEntityPermissionTx(tx, context, 'prediction', predictionId, 'view');
+    // all output sets have same signal signatures, so we get one and look into
+    // its signals
+    const predSet = await tx('predictions_signal_sets').where('prediction', predictionId).first();
+    if (!predSet) {
+        throw new interoperableErrors.NotFoundError();
+    }
+
+    const signals = await tx('signals').where('set', predSet.set);
+
+    let outputSignals = [];
+    for (let signal of signals) {
+        const filtered = filterObject(signal, new Set(['cid', 'name', 'type', 'description', 'namespace']))
+        outputSignals.push(filtered);
+    }
+
+    return outputSignals;
+}
+
 async function getOutputConfigTx(tx, context, predictionId) {
     await shares.enforceEntityPermissionTx(tx, context, 'prediction', predictionId, 'view');
-    const predSigs = await tx('predictions_signals').where('prediction', predictionId);
-    const outSignals = [];
-    for (let ps of predSigs) {
-        // trouble with permissions, even though we have created the object
-        //let signal = await getSignalByIdTx(context, ps.signal);
-        let signal = await tx('signals').where('id', ps.signal);
-        outSignals.push(signal);
-    }
+
+    const outSignals = await _getOutputSignals(tx, context, predictionId);
 
     const predSets = await tx('predictions_signal_sets').where('prediction', predictionId);
     let futureSet = {};
     let aheadSets = {};
-
 
     let i = 1;
     for (let ps of predSets) {
@@ -116,13 +135,11 @@ async function getOutputConfigTx(tx, context, predictionId) {
         }
     }
 
-    let val = {
+    return {
         ahead_sets: aheadSets,
         future_set: futureSet,
         signals: outSignals
     };
-
-    return val;
 }
 
 async function getOutputConfig(context, predictionId) {
