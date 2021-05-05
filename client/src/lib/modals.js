@@ -106,6 +106,7 @@ const entityTypeLabels = {
     'signal': t => t('Signal'),
     'job': t => t('Job'),
     'task': t => t('Task'),
+    'prediction': t => t('Predictions'),
     'panel': t => t('Panel'),
     'workspace': t => t('Workspace'),
     'user': t => t('User')
