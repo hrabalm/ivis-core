@@ -1,14 +1,12 @@
 'use strict';
 
 const knex = require('../lib/knex');
-const dtHelpers = require('../lib/dt-helpers');
 const { JobState } = require("../../shared/jobs");
 const { getBuiltinTask } = require("./builtin-tasks");
 const jobs = require('./jobs');
 const log = require('../lib/log');
 //const { createTx } = require('./signals');
-const { enforce, filterObject } = require('../lib/helpers');
-const shares = require('./shares');
+const { enforce } = require('../lib/helpers');
 const predictions = require('./signal-set-predictions');
 const { PredictionTypes, OutputSignalTypes } = require('../../shared/predictions');
 
@@ -24,9 +22,6 @@ async function createJob() {
 }
 
 async function createArimaModelTx(tx, context, sigSetId, params) {
-    console.log(`createArimaModelTx(context=${JSON.stringify(context)})`);
-    console.log(`params = ${params}`);
-
     const ts = params.ts;
 
     const signalSet = await tx('signal_sets').where('id', sigSetId).first();
@@ -93,8 +88,6 @@ async function createArimaModelTx(tx, context, sigSetId, params) {
     const jobId = await jobs.createTx(tx, context, job);
     await predictions.registerPredictionModelJobTx(tx, context, modelId, jobId);
 
-    console.log(`job: ${JSON.stringify(job)}`);
-
     //await predictions.getOutputConfigTx(tx, context, modelId);
 
     // run the job
@@ -121,7 +114,7 @@ async function createAndStart(context, sigSetId, params) {
     const setId = prediction.set;
 
     const outputConfig = await predictions.getOutputConfig(context, modelId);
-    console.log(`outputConfig = ${JSON.stringify(outputConfig)}`);
+    // console.log(`outputConfig = ${JSON.stringify(outputConfig)}`);
 
     // run the job
     jobs.run(context, jobId).catch(error => log.error('predictions-arima', error));
