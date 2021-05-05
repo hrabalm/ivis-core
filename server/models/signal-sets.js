@@ -278,6 +278,14 @@ async function _remove(context, key, id) {
         const exists = await tx('aggregation_jobs').where('set', existing.id).first();
         enforce(!exists, `Signal set has aggregation ${exists ? exists.id : ''} delete it first.`);
 
+        // ensure there are no prediction models under this signal set
+        await dependencyHelpers.ensureNoDependencies(tx, context, id, [
+            {
+                entityTypeId: 'prediction',
+                column: 'set'
+            }
+        ]);
+
         await tx('signals').where('set', existing.id).del();
         await tx('signal_sets').where('id', existing.id).del();
 
