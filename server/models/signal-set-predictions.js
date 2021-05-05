@@ -13,9 +13,17 @@ const createSigSet = require('./signal-sets').createTx;
 const createSignal = require('./signals').createTx;
 const { PredictionTypes } = require('../../shared/predictions');
 const interoperableErrors = require('../../shared/interoperable-errors');
+const jobs = require('./jobs');
+const removeSigSetById = require('./signal-sets').removeById;
 
 
 const allowedKeys = new Set(['name', 'set', 'type', 'namespace', 'settings', 'ahead_count', 'future_count']);
+
+const deleteCallbacks = {
+    [PredictionTypes.ARIMA]: async (tx, context, predictionId) => {
+        // doing arima specific cleanup before the remaining is taken care of
+    }
+}
 
 async function listDTAjax(context, sigSetId, params) {
     return await dtHelpers.ajaxList(
@@ -26,6 +34,61 @@ async function listDTAjax(context, sigSetId, params) {
         //.join('predictions_signal_sets', 'set', '=', 'predictions_signal_sets.id'),
         ['predictions.id', 'predictions.set', 'predictions.name', 'predictions.type'],
     );
+}
+
+async function _deleteTypeSpecificTx(tx, context, predictionId, type) {
+    if (type in deleteCallbacks) {
+        return await deleteCallbacks[type](tx, context, predictionId);
+    }
+}
+
+async function removeById(context, setId, predictionId) {
+    let jobsToDelete;
+    let setsToDelete;
+
+    const val =  await knex.transaction(async tx => {
+        const existing = await tx('predictions').where('id', predictionId).first();
+
+        if (!existing) {
+            shares.throwPermissionDenied();
+        }
+
+        await shares.enforceEntityPermissionTx(tx, context, 'prediction', existing.id, 'delete');
+
+        // Type specific delete
+        await _deleteTypeSpecificTx(tx, context, predictionId, existing.type);
+
+        // unlink remaining jobs
+        jobsToDelete = await tx('predictions_jobs').where('prediction', existing.id);
+        for (let job of jobsToDelete) {
+            await tx('predictions_jobs').where('prediction', existing.id).where('job', job.job).del();
+        }
+
+        const predSignals = await tx('predictions_signals').where('prediction', existing.id);
+        for (let signal of predSignals) {
+            await tx('predictions_signals').where('prediction', signal.prediction).where('signal', signal.signal).del();
+        }
+
+        setsToDelete = await tx('predictions_signal_sets').where('prediction', existing.id);
+        for (let set of setsToDelete) {
+            await tx('predictions_signal_sets').where('prediction', set.prediction).where('set', set.set).del();
+            // we will delete the set itself after the transaction
+        }
+
+        await tx('predictions').where('id', existing.id).del();
+    });
+
+    // delete the signal sets
+    for (let set of setsToDelete) {
+        await removeSigSetById(context, set.set);
+    }
+
+    // clean up the jobs
+    for (let job of jobsToDelete) {
+        await jobs.remove(context, job.job);
+    }
+
+    return val;
 }
 
 function _isValidType(type) {
@@ -279,6 +342,7 @@ async function registerPredictionModelJobTx(tx, context, modelId, jobId) {
 }
 
 module.exports.getById = getById;
+module.exports.removeById = removeById;
 module.exports.registerPredictionModelTx = registerPredictionModelTx;
 module.exports.registerPredictionModelJobTx = registerPredictionModelJobTx;
 module.exports.update = update;

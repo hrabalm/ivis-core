@@ -195,6 +195,11 @@ router.postAsync('/signal-set-aggregations-table/:signalSetId', passport.loggedI
     return res.json(await signalSetsAggregations.listDTAjax(req.context, castToInteger(req.params.signalSetId), req.body));
 });
 
+router.deleteAsync('/signal-sets/:signalSetId/predictions/:predictionId', passport.loggedIn, passport.csrfProtection, async (req, res) => {
+    await signalSetsPredictions.removeById(req.context, castToInteger(req.params.signalSetId), castToInteger(req.params.predictionId));
+    return res.json();
+});
+
 router.postAsync('/signal-sets/:signalSetId/predictions/arima', passport.loggedIn, passport.csrfProtection, async (req, res) => {
     return res.json(await arima.create(req.context, castToInteger(req.params.signalSetId), req.body));
 })

@@ -4,13 +4,14 @@ import React, { Component } from "react";
 import { tableAddDeleteButton, tableRestActionDialogInit, tableRestActionDialogRender } from "../../lib/modals";
 import { withComponentMixins } from "../../lib/decorator-helpers";
 import { withTranslation } from "../../lib/i18n";
+import { withAsyncErrorHandler, withErrorHandling } from "../../lib/error-handling";
 import { Panel } from "../../lib/panel";
 import { Table } from "../../lib/table";
 import { Toolbar, LinkButton, requiresAuthenticatedUser } from "../../lib/page";
 
 @withComponentMixins([
     withTranslation,
-    //withErrorHandling,
+    withErrorHandling,
     //withPageHelpers,
     requiresAuthenticatedUser
 ])
@@ -46,6 +47,15 @@ export default class PredictionsList extends Component {
                 }
             },
             { data: 3, title: t('Type'), render: data => `${data}` },
+            {
+                actions: data => {
+                    const actions = [];
+                    const perms = null;
+                    tableAddDeleteButton(actions, this, perms, `rest/signal-sets/${data[1]}/predictions/${data[0]}`, data[2], t('Deleting prediction model ...', t('Prediction model deleted')));
+
+                    return actions;
+                }
+            }
             /*{ data: 1, title: t('sigSetId(debug)'), render: data => `${data}` },
             {
                 data: 2,
