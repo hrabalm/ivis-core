@@ -12,7 +12,6 @@ exports.up = (knex, Promise) => (async () => {
             .onDelete('CASCADE'); // delete predictions if its owner set gets deleted
         table.string('name');
         table.string('type');
-        table.string('state');
         table.integer('ahead_count').unsigned().notNullable();
         table.integer('future_count').unsigned().notNullable();
         table.text('settings', 'longtext');

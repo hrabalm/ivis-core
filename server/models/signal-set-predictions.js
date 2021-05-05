@@ -15,7 +15,7 @@ const { PredictionTypes } = require('../../shared/predictions');
 const interoperableErrors = require('../../shared/interoperable-errors');
 
 
-const allowedKeys = new Set(['name', 'set', 'type', 'state', 'namespace', 'settings', 'ahead_count', 'future_count']);
+const allowedKeys = new Set(['name', 'set', 'type', 'namespace', 'settings', 'ahead_count', 'future_count']);
 
 async function listDTAjax(context, sigSetId, params) {
     return await dtHelpers.ajaxList(
