@@ -121,7 +121,7 @@ def get_arima_order(params):
     return (5, 0, 1)
 
 def get_ahead_count(params):
-    return params['futurePredictions']
+    return int(params['futurePredictions'])
 
 
 def get_is_aggregated(params) -> bool:
@@ -141,7 +141,7 @@ def write_predictions(params, timestamps, values):
         for ahead, (t, v) in enumerate(zip(timestamps, values), start=1):
             record = {
                 'ts': t,
-                'predicted_value': v
+                'value': v
             }
             writer.write(record, ahead)
 
