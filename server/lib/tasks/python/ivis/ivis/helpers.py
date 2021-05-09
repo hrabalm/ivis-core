@@ -204,33 +204,10 @@ class Ivis:
         """
         index = self.get_signal_set_index(set_cid)
 
-        # Originally, delete_by_query was used.
-        # body = {'query': {'match_all': {}}}
-        # ivis.elasticsearch.delete_by_query(index=index, body=body)
-
-        # The problem with the original solution is that if .delete_by_query is
-        # soon followed by .index, version_conflicts can occur.
-
-        # Instead, index is now deleted and a new one is created.
-
-        # The advantage of this solution, that index can be called immediately
-        # after the index is created.
-
-        # Get old index mappings so that we can migrate them to the new index
-        mappings = ivis.elasticsearch.indices.get_mapping(index=index)
-        body = mappings[index]
-
-        # Also migrate relevant settings of the previous index
-        settings = ivis.elasticsearch.indices.get_settings(index=index)
-        wanted = ['number_of_shards', 'number_of_replicas']
-        body['settings'] = {
-            'index': {
-                k: v for k, v in settings[index]['settings']['index'].items() if k in wanted
-            }
-        }
-
-        ivis.elasticsearch.indices.delete(index=index)
-        ivis.elasticsearch.indices.create(index=index, body=body)
+        # Index has to be refreshed to prevent version collisions which could
+        # occur when we index the new data.
+        body = {'query': {'match_all': {}}}
+        ivis.elasticsearch.delete_by_query(index=index, body=body, refresh=True)
 
 
 ivis = Ivis()
